@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { trpc } from '../lib/trpc'
 import { format, differenceInMonths, differenceInYears } from 'date-fns'
 
@@ -28,6 +28,7 @@ function formatAge(birthday: string | Date) {
 
 export function PatientDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const { data: patient, isLoading } = trpc.patient.getById.useQuery({ id: id! })
 
   if (isLoading) return <div className="text-center py-12 text-gray-500">Загрузка...</div>
@@ -60,13 +61,19 @@ export function PatientDetailPage() {
           )}
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => navigate(`/patients/${id}/record`)}
+            className="bg-green-700 text-white text-sm px-4 py-2 rounded-md hover:bg-green-800 font-medium"
+          >
+            💉 Записать прививку
+          </button>
           <a
             href={`/api/v1/documents/patients/${id}/form063u`}
             target="_blank"
             rel="noreferrer"
             className="text-sm border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50"
           >
-            Форма 063/у ↓
+            063/у ↓
           </a>
           <a
             href={`/api/v1/documents/patients/${id}/certificate`}
@@ -87,7 +94,15 @@ export function PatientDetailPage() {
           </span>
         </div>
         {patient.vaccinationRecords.length === 0 ? (
-          <div className="px-4 py-8 text-gray-400 text-sm text-center">Прививок нет</div>
+          <div className="px-4 py-8 text-gray-400 text-sm text-center">
+            Прививок нет —{' '}
+            <button
+              onClick={() => navigate(`/patients/${id}/record`)}
+              className="text-blue-600 hover:underline"
+            >
+              записать первую
+            </button>
+          </div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
@@ -109,9 +124,7 @@ export function PatientDetailPage() {
                   <td className="px-4 py-2 text-gray-600">{r.vaccine?.name ?? '—'}</td>
                   <td className="px-4 py-2 text-gray-500">{r.series ?? '—'}</td>
                   <td className="px-4 py-2 text-gray-500">
-                    {r.doctor
-                      ? `${r.doctor.lastName} ${r.doctor.firstName[0]}.`
-                      : '—'}
+                    {r.doctor ? `${r.doctor.lastName} ${r.doctor.firstName[0]}.` : '—'}
                   </td>
                 </tr>
               ))}

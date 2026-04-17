@@ -1,0 +1,73 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vaccitrack
+      POSTGRES_USER: vaccitrack
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [vaccitrack]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.0
+    restart: unless-stopped
+    command: start-dev --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/vaccitrack
+      KC_DB_USERNAME: vaccitrack
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      KC_DB_SCHEMA: keycloak
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-changeme}
+      KC_HOSTNAME_STRICT: false
+      KC_HTTP_ENABLED: true
+    volumes:
+      - ./infra/keycloak:/opt/keycloak/data/import
+    depends_on: [postgres]
+    networks: [vaccitrack]
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://vaccitrack:${POSTGRES_PASSWORD:-changeme}@postgres:5432/vaccitrack
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: vaccitrack
+      KEYCLOAK_CLIENT_ID: vaccitrack-api
+      KEYCLOAK_SECRET: ${KEYCLOAK_SECRET}
+      NODE_ENV: production
+    depends_on: [postgres, keycloak]
+    networks: [vaccitrack]
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    networks: [vaccitrack]
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/certs:/etc/nginx/certs:ro
+    depends_on: [api, web]
+    networks: [vaccitrack]
+
+volumes:
+  postgres_data:
+
+networks:
+  vaccitrack:
+    driver: bridge

@@ -1,0 +1,12 @@
+{
+  "name": "@vaccitrack/pdf",
+  "version": "0.0.1",
+  "main": "./src/index.ts",
+  "dependencies": {
+    "pdfkit": "^0.15.0",
+    "@vaccitrack/db": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/pdfkit": "^0.13.0"
+  }
+}

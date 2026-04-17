@@ -1,0 +1,333 @@
+// VacciTrack — схема БД
+// Основана на анализе Visual FoxPro базы (VACCINA детское)
+// PostgreSQL + Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  shortName String?
+  okpo      String?
+  okud      String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sites    Site[]
+  users    User[]
+  patients Patient[]
+  vaccines Vaccine[]
+}
+
+model Site {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  address        String?
+
+  districts District[]
+  doctors   Doctor[]
+}
+
+model User {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  login          String
+  fullName       String
+  role           UserRole
+  doctorProfile  Doctor?
+  createdAt      DateTime     @default(now())
+
+  vaccinationRecords VaccinationRecord[]
+}
+
+enum UserRole {
+  ADMIN
+  DOCTOR
+  NURSE
+  REGISTRAR
+  HEAD_DOCTOR
+}
+
+model District {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id])
+  code   String
+  name   String
+
+  patients Patient[]
+  doctors  DoctorDistrict[]
+}
+
+model Doctor {
+  id         String  @id @default(cuid())
+  siteId     String
+  site       Site    @relation(fields: [siteId], references: [id])
+  userId     String? @unique
+  user       User?   @relation(fields: [userId], references: [id])
+  lastName   String
+  firstName  String
+  middleName String?
+  specialty  String?
+
+  districts          DoctorDistrict[]
+  vaccinationRecords VaccinationRecord[]
+}
+
+model DoctorDistrict {
+  doctorId   String
+  districtId String
+  doctor     Doctor   @relation(fields: [doctorId], references: [id])
+  district   District @relation(fields: [districtId], references: [id])
+
+  @@id([doctorId, districtId])
+}
+
+model Vaccine {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  tradeName      String?
+  producer       String?
+  country        String?
+  dosesMl        Float?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  scheduleLinks      VaccineScheduleLink[]
+  vaccinationRecords VaccinationRecord[]
+}
+
+model VaccineSchedule {
+  id       String           @id @default(cuid())
+  parentId String?
+  parent   VaccineSchedule?  @relation("ScheduleChain", fields: [parentId], references: [id])
+  children VaccineSchedule[] @relation("ScheduleChain")
+
+  code      String
+  key       String?
+  name      String
+  shortName String?
+  isActive  Boolean @default(true)
+  isEpid    Boolean @default(false)
+
+  minAgeYears  Int @default(0)
+  minAgeMonths Int @default(0)
+  minAgeDays   Int @default(0)
+  maxAgeYears  Int @default(99)
+  maxAgeMonths Int @default(0)
+  maxAgeDays   Int @default(0)
+
+  intervalDays   Int @default(0)
+  intervalMonths Int @default(0)
+  intervalYears  Int @default(0)
+
+  medExemptionLimitDays   Int @default(0)
+  medExemptionLimitMonths Int @default(0)
+  medExemptionLimitYears  Int @default(0)
+
+  nextScheduleId String?
+  nextSchedule   VaccineSchedule?  @relation("ScheduleNext", fields: [nextScheduleId], references: [id])
+  prevSchedule   VaccineSchedule[] @relation("ScheduleNext")
+
+  vaccines           VaccineScheduleLink[]
+  vaccinationRecords VaccinationRecord[]
+  planItems          VaccinationPlanItem[]
+}
+
+model VaccineScheduleLink {
+  vaccineId         String
+  vaccineScheduleId String
+  vaccine           Vaccine         @relation(fields: [vaccineId], references: [id])
+  vaccineSchedule   VaccineSchedule @relation(fields: [vaccineScheduleId], references: [id])
+
+  @@id([vaccineId, vaccineScheduleId])
+}
+
+model MedExemptionType {
+  id       String  @id @default(cuid())
+  name     String
+  isSystem Boolean @default(false)
+
+  patientExemptions  PatientMedExemption[]
+  vaccinationRecords VaccinationRecord[]
+}
+
+model RiskGroup {
+  id       String    @id @default(cuid())
+  name     String
+  patients Patient[]
+}
+
+model InsuranceCompany {
+  id       String    @id @default(cuid())
+  name     String
+  code     String?
+  patients Patient[]
+}
+
+model Patient {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  districtId     String?
+  district       District?    @relation(fields: [districtId], references: [id])
+  riskGroupId    String?
+  riskGroup      RiskGroup?   @relation(fields: [riskGroupId], references: [id])
+  insuranceId    String?
+  insurance      InsuranceCompany? @relation(fields: [insuranceId], references: [id])
+
+  lastName   String
+  firstName  String
+  middleName String?
+  sex        Sex
+  birthday   DateTime @db.Date
+
+  regionId     String?
+  cityName     String?
+  streetName   String?
+  house        String?
+  building     String?
+  structure    String?
+  apartment    String?
+  phone        String?
+  extraAddress String?
+
+  policySerial String?
+  policyNumber String?
+
+  isResident Boolean @default(true)
+  isAlive    Boolean @default(true)
+  isDecret   Boolean @default(false)
+  isGkdc     Boolean @default(false)
+
+  activeMedExemptionId String?
+  activeMedExemption   PatientMedExemption? @relation("ActiveExemption", fields: [activeMedExemptionId], references: [id])
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdByLogin String?
+
+  medExemptions      PatientMedExemption[] @relation("PatientExemptions")
+  vaccinationRecords VaccinationRecord[]
+  planItems          VaccinationPlanItem[]
+}
+
+enum Sex {
+  MALE
+  FEMALE
+}
+
+model PatientMedExemption {
+  id                 String           @id @default(cuid())
+  patientId          String
+  patient            Patient          @relation("PatientExemptions", fields: [patientId], references: [id])
+  medExemptionTypeId String
+  medExemptionType   MedExemptionType @relation(fields: [medExemptionTypeId], references: [id])
+  dateFrom           DateTime         @db.Date
+  dateTo             DateTime?        @db.Date
+  note               String?
+
+  activeForPatients Patient[] @relation("ActiveExemption")
+}
+
+model VaccinationRecord {
+  id                String           @id @default(cuid())
+  patientId         String
+  patient           Patient          @relation(fields: [patientId], references: [id])
+  vaccineScheduleId String?
+  vaccineSchedule   VaccineSchedule? @relation(fields: [vaccineScheduleId], references: [id])
+  vaccineId         String?
+  vaccine           Vaccine?         @relation(fields: [vaccineId], references: [id])
+  doctorId          String?
+  doctor            Doctor?          @relation(fields: [doctorId], references: [id])
+  createdById       String?
+  createdBy         User?            @relation(fields: [createdById], references: [id])
+
+  isEpid     Boolean @default(false)
+  isExternal Boolean @default(false)
+
+  ageYears  Int @default(0)
+  ageMonths Int @default(0)
+  ageDays   Int @default(0)
+
+  vaccinationDate DateTime @db.Date
+  doseNumber      Float?
+  series          String?
+  checkNumber     String?
+  result          String?
+
+  medExemptionTypeId String?
+  medExemptionType   MedExemptionType? @relation(fields: [medExemptionTypeId], references: [id])
+  medExemptionDate   DateTime?         @db.Date
+
+  nextScheduledDate DateTime? @db.Date
+  nextScheduleId    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([vaccinationDate])
+  @@index([vaccineScheduleId])
+}
+
+model VaccinationPlanItem {
+  id                String          @id @default(cuid())
+  patientId         String
+  patient           Patient         @relation(fields: [patientId], references: [id])
+  vaccineScheduleId String
+  vaccineSchedule   VaccineSchedule @relation(fields: [vaccineScheduleId], references: [id])
+  plannedDate       DateTime        @db.Date
+  status            PlanStatus      @default(PLANNED)
+  note              String?
+
+  @@unique([patientId, vaccineScheduleId])
+  @@index([plannedDate])
+  @@index([status])
+}
+
+enum PlanStatus {
+  PLANNED
+  DONE
+  OVERDUE
+  EXEMPTED
+  REFUSED
+}
+
+model GeneratedDocument {
+  id          String       @id @default(cuid())
+  type        DocumentType
+  patientId   String?
+  periodFrom  DateTime?    @db.Date
+  periodTo    DateTime?    @db.Date
+  generatedBy String
+  generatedAt DateTime     @default(now())
+  fileKey     String?
+}
+
+enum DocumentType {
+  FORM_063U
+  CERTIFICATE
+  PLAN_MONTH
+  REPORT_OPP1
+  REPORT_OPP2
+  REPORT_OPP3
+  REPORT_OPP4
+  REPORT_OPP5
+  REPORT_OPP6
+  REPORT_MEDEXEMPT
+  NOTIFICATION
+}

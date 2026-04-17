@@ -1,0 +1,10 @@
+{
+  "name": "@vaccitrack/trpc",
+  "version": "0.0.1",
+  "main": "./src/index.ts",
+  "dependencies": {
+    "@trpc/server": "^11.0.0",
+    "zod": "^3.23.0",
+    "@vaccitrack/db": "workspace:*"
+  }
+}

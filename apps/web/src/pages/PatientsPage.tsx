@@ -3,6 +3,15 @@ import { Link } from 'react-router-dom'
 import { trpc } from '../lib/trpc'
 import { format } from 'date-fns'
 
+function ageLabel(birthday: Date | string) {
+  const bd = new Date(birthday)
+  const ms = Date.now() - bd.getTime()
+  const years = Math.floor(ms / (1000 * 60 * 60 * 24 * 365.25))
+  if (years >= 1) return `${years} ${years === 1 ? 'год' : years < 5 ? 'года' : 'лет'}`
+  const months = Math.floor(ms / (1000 * 60 * 60 * 24 * 30.5))
+  return `${months} мес.`
+}
+
 export function PatientsPage() {
   const [search, setSearch] = useState('')
   const [districtId, setDistrictId] = useState<string | undefined>()
@@ -16,27 +25,29 @@ export function PatientsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold text-gray-900">Пациенты</h1>
-        <Link
-          to="/patients/new"
-          className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700"
-        >
+      <div className="vt-page-head">
+        <div>
+          <h1 className="vt-page-title">Пациенты</h1>
+          {data && (
+            <div className="vt-page-sub">Всего в базе: {data.total}</div>
+          )}
+        </div>
+        <Link to="/patients/new" className="vt-btn vt-btn-primary">
           + Добавить пациента
         </Link>
       </div>
 
-      <div className="flex gap-3 mb-4">
+      <div className="vt-toolbar">
         <input
+          className="vt-input"
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-          placeholder="Поиск по ФИО или номеру полиса..."
-          className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Поиск по ФИО или номеру полиса…"
         />
         <select
+          className="vt-select"
           value={districtId ?? ''}
           onChange={(e) => { setDistrictId(e.target.value || undefined); setPage(1) }}
-          className="border border-gray-300 rounded-md px-3 py-2 text-sm"
         >
           <option value="">Все участки</option>
           {districts?.map((d) => (
@@ -45,80 +56,86 @@ export function PatientsPage() {
         </select>
       </div>
 
-      {isLoading ? (
-        <div className="text-center py-12 text-gray-500">Загрузка...</div>
-      ) : (
-        <>
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+      <div className="vt-card">
+        {isLoading ? (
+          <div className="vt-loading">Загрузка…</div>
+        ) : !data?.items.length ? (
+          <div className="vt-empty">Пациенты не найдены</div>
+        ) : (
+          <>
+            <table className="vt-table">
+              <thead>
                 <tr>
-                  {['ФИО', 'Дата рождения', 'Возраст', 'Участок', 'Полис', 'Медотвод'].map((h) => (
-                    <th key={h} className="text-left px-4 py-2.5 text-gray-600 font-medium">{h}</th>
-                  ))}
+                  <th>ФИО</th>
+                  <th>Дата рождения</th>
+                  <th>Возраст</th>
+                  <th>Участок</th>
+                  <th>Полис</th>
+                  <th>Медотвод</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {data?.items.map((p) => {
-                  const age = Math.floor(
-                    (Date.now() - new Date(p.birthday).getTime()) / (1000 * 60 * 60 * 24 * 365.25)
-                  )
+              <tbody>
+                {data.items.map((p) => {
+                  const initials = (p.lastName[0] ?? '') + (p.firstName[0] ?? '')
                   return (
-                    <tr key={p.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2.5">
-                        <Link
-                          to={`/patients/${p.id}`}
-                          className="text-blue-600 hover:underline font-medium"
-                        >
-                          {p.lastName} {p.firstName} {p.middleName ?? ''}
-                        </Link>
+                    <tr key={p.id}>
+                      <td>
+                        <div className="vt-name-cell">
+                          <div className="vt-avatar">{initials}</div>
+                          <Link to={`/patients/${p.id}`} className="vt-link">
+                            {p.lastName} {p.firstName} {p.middleName ?? ''}
+                          </Link>
+                        </div>
                       </td>
-                      <td className="px-4 py-2.5 text-gray-600">
+                      <td className="vt-muted">
                         {format(new Date(p.birthday), 'dd.MM.yyyy')}
                       </td>
-                      <td className="px-4 py-2.5 text-gray-500 text-xs">
-                        {age < 1
-                          ? `${Math.floor((Date.now() - new Date(p.birthday).getTime()) / (1000 * 60 * 60 * 24 * 30.5))} мес.`
-                          : `${age} лет`}
-                      </td>
-                      <td className="px-4 py-2.5 text-gray-600">{p.district?.code ?? '—'}</td>
-                      <td className="px-4 py-2.5 text-gray-600">
-                        {[p.policySerial, p.policyNumber].filter(Boolean).join(' ') || '—'}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        {p.activeMedExemption && (
-                          <span className="inline-flex px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800">
-                            {p.activeMedExemption.medExemptionType.name}
-                          </span>
+                      <td className="vt-muted">{ageLabel(p.birthday)}</td>
+                      <td>
+                        {p.district ? (
+                          <span className="vt-badge vt-badge-neutral">{p.district.code}</span>
+                        ) : (
+                          <span className="vt-hint">—</span>
                         )}
+                      </td>
+                      <td className="vt-muted">
+                        {[p.policySerial, p.policyNumber].filter(Boolean).join(' ') || (
+                          <span className="vt-hint">—</span>
+                        )}
+                      </td>
+                      <td>
+                        {p.activeMedExemption ? (
+                          <span className="vt-badge vt-badge-warn">
+                            ⚠ {p.activeMedExemption.medExemptionType.name}
+                          </span>
+                        ) : null}
                       </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
-          </div>
 
-          {data && data.pages > 1 && (
-            <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
-              <span>Всего: {data.total}</span>
-              <div className="flex gap-2">
-                <button
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => p - 1)}
-                  className="px-3 py-1 border rounded disabled:opacity-40"
-                >←</button>
-                <span className="px-3 py-1">{page} / {data.pages}</span>
-                <button
-                  disabled={page === data.pages}
-                  onClick={() => setPage((p) => p + 1)}
-                  className="px-3 py-1 border rounded disabled:opacity-40"
-                >→</button>
+            {data.pages > 1 && (
+              <div className="vt-pagination">
+                <span>Страница {page} из {data.pages}</span>
+                <div className="vt-pagination-ctrls">
+                  <button
+                    className="vt-btn vt-btn-icon"
+                    disabled={page === 1}
+                    onClick={() => setPage((p) => p - 1)}
+                  >←</button>
+                  <button
+                    className="vt-btn vt-btn-icon"
+                    disabled={page === data.pages}
+                    onClick={() => setPage((p) => p + 1)}
+                  >→</button>
+                </div>
               </div>
-            </div>
-          )}
-        </>
-      )}
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 }

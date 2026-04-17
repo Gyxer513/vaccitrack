@@ -3,24 +3,22 @@ import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
 import { trpc, trpcClient } from './lib/trpc'
-import { initKeycloak } from './lib/keycloak'
 import App from './App'
 import './index.css'
+import './styles/vt.css'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 })
 
-initKeycloak().then(() => {
-  ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
-      <trpc.Provider client={trpcClient} queryClient={queryClient}>
-        <QueryClientProvider client={queryClient}>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </QueryClientProvider>
-      </trpc.Provider>
-    </React.StrictMode>,
-  )
-})
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </QueryClientProvider>
+    </trpc.Provider>
+  </React.StrictMode>,
+)

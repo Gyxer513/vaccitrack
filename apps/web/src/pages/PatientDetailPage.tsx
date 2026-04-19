@@ -62,7 +62,7 @@ export function PatientDetailPage() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => navigate(`/patients/${id}/record`)}
+            onClick={() => navigate(`/vaccination/new?patientId=${id}`)}
             className="bg-green-700 text-white text-sm px-4 py-2 rounded-md hover:bg-green-800 font-medium"
           >
             💉 Записать прививку
@@ -97,7 +97,7 @@ export function PatientDetailPage() {
           <div className="px-4 py-8 text-gray-400 text-sm text-center">
             Прививок нет —{' '}
             <button
-              onClick={() => navigate(`/patients/${id}/record`)}
+              onClick={() => navigate(`/vaccination/new?patientId=${id}`)}
               className="text-blue-600 hover:underline"
             >
               записать первую

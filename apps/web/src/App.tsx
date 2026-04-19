@@ -3,13 +3,13 @@ import { Layout } from './components/layout/Layout'
 import { PatientsPage } from './pages/PatientsPage'
 import { PatientDetailPage } from './pages/PatientDetailPage'
 import { PlanPage } from './pages/PlanPage'
-import { RecordVaccinationPage } from './pages/RecordVaccinationPage'
+import { NewVaccinationPage } from './pages/NewVaccinationPage'
 
 export default function App() {
   return (
     <Routes>
       {/* Форма записи — без Layout (своя шапка) */}
-      <Route path="/patients/:id/record" element={<RecordVaccinationPage />} />
+      <Route path="/vaccination/new" element={<NewVaccinationPage />} />
 
       {/* Остальное — с Layout */}
       <Route path="*" element={

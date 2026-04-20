@@ -219,42 +219,60 @@ export function PatientDetailPage() {
                 <th>Возраст</th>
                 <th>Препарат</th>
                 <th>Серия</th>
+                <th>Этап</th>
                 <th>Защищает от</th>
                 <th>Доза</th>
                 <th>Врач</th>
               </tr>
             </thead>
             <tbody>
-              {injections.map((inj) => (
-                <tr key={inj.key}>
-                  <td className="vt-mono">{format(inj.date, 'dd.MM.yyyy')}</td>
-                  <td className="vt-muted">{ageAt(patient.birthday, inj.date)}</td>
-                  <td>
-                    <div style={{ fontWeight: 500 }}>{inj.vaccineName}</div>
-                    {inj.producer && <div className="vt-hint">{inj.producer}</div>}
-                  </td>
-                  <td className="vt-mono vt-muted">{inj.series ?? '—'}</td>
-                  <td>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                      {inj.diseases.length === 0 ? (
+              {injections.map((inj) => {
+                const steps = Array.from(
+                  new Set(inj.diseases.map((d) => d.doseLabel).filter(Boolean) as string[]),
+                )
+                return (
+                  <tr key={inj.key}>
+                    <td className="vt-mono">{format(inj.date, 'dd.MM.yyyy')}</td>
+                    <td className="vt-muted">{ageAt(patient.birthday, inj.date)}</td>
+                    <td>
+                      <div style={{ fontWeight: 500 }}>{inj.vaccineName}</div>
+                      {inj.producer && <div className="vt-hint">{inj.producer}</div>}
+                    </td>
+                    <td className="vt-mono vt-muted">{inj.series ?? '—'}</td>
+                    <td>
+                      {steps.length === 0 ? (
                         <span className="vt-hint">—</span>
+                      ) : steps.length === 1 ? (
+                        <span style={{ fontSize: 13 }}>{steps[0]}</span>
                       ) : (
-                        inj.diseases.map((d) => (
-                          <span
-                            key={d.id}
-                            className="vt-badge vt-badge-accent"
-                            title={d.doseLabel ? `${d.name} · ${d.doseLabel}` : d.name}
-                          >
-                            {d.name}
-                          </span>
-                        ))
+                        <span style={{ fontSize: 13 }} title={steps.join(', ')}>
+                          {steps[0]}
+                          <span className="vt-hint"> +{steps.length - 1}</span>
+                        </span>
                       )}
-                    </div>
-                  </td>
-                  <td className="vt-mono vt-muted">{inj.doseMl ? `${inj.doseMl} мл` : '—'}</td>
-                  <td className="vt-muted">{doctorShort(inj.doctor)}</td>
-                </tr>
-              ))}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {inj.diseases.length === 0 ? (
+                          <span className="vt-hint">—</span>
+                        ) : (
+                          inj.diseases.map((d) => (
+                            <span
+                              key={d.id}
+                              className="vt-badge vt-badge-accent"
+                              title={d.doseLabel ? `${d.name} · ${d.doseLabel}` : d.name}
+                            >
+                              {d.name}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </td>
+                    <td className="vt-mono vt-muted">{inj.doseMl ? `${inj.doseMl} мл` : '—'}</td>
+                    <td className="vt-muted">{doctorShort(inj.doctor)}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}

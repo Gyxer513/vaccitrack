@@ -12,12 +12,12 @@ export const vaccinationRouter = router({
         vaccinationDate: z.coerce.date(),
         series: z.string().optional(),
         doseNumber: z.number().optional(),
+        doseVolumeMl: z.number().optional(),
         result: z.string().optional(),
+        note: z.string().optional(),
         doctorId: z.string().optional(),
         isEpid: z.boolean().default(false),
         isExternal: z.boolean().default(false),
-        medExemptionTypeId: z.string().optional(),
-        medExemptionDate: z.coerce.date().optional(),
         nextScheduledDate: z.coerce.date().optional(),
       }),
     )
@@ -36,13 +36,60 @@ export const vaccinationRouter = router({
             patientId: input.patientId,
             vaccineScheduleId: input.vaccineScheduleId,
           },
-          data: {
-            status: input.medExemptionTypeId ? PlanStatus.EXEMPTED : PlanStatus.DONE,
-          },
+          data: { status: PlanStatus.DONE },
         })
       }
 
       return record
+    }),
+
+  exempt: protectedProcedure
+    .input(
+      z.object({
+        patientId: z.string(),
+        vaccineScheduleId: z.string().optional(),
+        medExemptionTypeId: z.string(),
+        dateFrom: z.coerce.date(),
+        dateTo: z.coerce.date().optional(),
+        note: z.string().optional(),
+        doctorId: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.patient.findFirstOrThrow({
+        where: { id: input.patientId, organizationId: ctx.user.orgId },
+      })
+
+      const exemption = await ctx.prisma.patientMedExemption.create({
+        data: {
+          patientId: input.patientId,
+          medExemptionTypeId: input.medExemptionTypeId,
+          dateFrom: input.dateFrom,
+          dateTo: input.dateTo,
+          note: input.note,
+        },
+      })
+
+      // Считаем этот отвод активным только если он бессрочный или ещё не истёк.
+      const isActive = !input.dateTo || input.dateTo >= new Date()
+      if (isActive) {
+        await ctx.prisma.patient.update({
+          where: { id: input.patientId },
+          data: { activeMedExemptionId: exemption.id },
+        })
+      }
+
+      if (input.vaccineScheduleId) {
+        await ctx.prisma.vaccinationPlanItem.updateMany({
+          where: {
+            patientId: input.patientId,
+            vaccineScheduleId: input.vaccineScheduleId,
+          },
+          data: { status: PlanStatus.EXEMPTED },
+        })
+      }
+
+      return exemption
     }),
 
   journalByDistrict: protectedProcedure

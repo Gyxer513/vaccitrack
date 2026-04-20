@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
+import './VaccinationForm.css'
 import {
   IconActivity,
   IconAlertCircle,
@@ -16,6 +17,7 @@ import {
 } from './icons'
 import {
   STATUS_LABEL,
+  STATUS_ORDER,
   getLastDose,
   getScheduleDisplay,
   getScheduleStatus,
@@ -25,8 +27,25 @@ import {
 } from './schedule-display'
 
 type Mode = 'vaccination' | 'exemption'
+type StatusFilter = 'all' | 'overdue' | 'due-soon' | 'planned' | 'never'
 
-const today = () => new Date().toISOString().split('T')[0]
+// Локальная дата (YYYY-MM-DD) без TZ-конверсии. toISOString даёт UTC и после 21:00 по МСК
+// возвращает завтрашнюю дату — это ломало max={today()} и парсинг при submit.
+const todayLocal = () => {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+// Парсит YYYY-MM-DD как локальную полночь (не UTC). new Date('2026-04-20') даёт UTC-полночь,
+// что в UTC+3 превращается в 03:00 локальных — при сохранении без времени всё ок,
+// но для консистентности передаём локальную полночь.
+const parseLocalDate = (s: string) => {
+  const [y, m, d] = s.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
 
 const calcAge = (birthday: Date | string): number => {
   const b = new Date(birthday)
@@ -65,25 +84,44 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
   const doctorsQ = trpc.reference.doctors.useQuery()
   const exemptionTypesQ = trpc.reference.medExemptionTypes.useQuery()
 
-  const recordMutation = trpc.vaccination.record.useMutation({
-    onSuccess: () => {
-      setSaved(true)
-      setTimeout(() => navigate(`/patients/${patientId}`), 1200)
-    },
-  })
+  const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isMounted = useRef(true)
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false
+      if (redirectTimer.current) clearTimeout(redirectTimer.current)
+    }
+  }, [])
+
+  const onSuccessCommon = () => {
+    if (!isMounted.current) return
+    setSaved(true)
+    redirectTimer.current = setTimeout(() => {
+      if (isMounted.current) navigate(`/patients/${patientId}`)
+    }, 1200)
+  }
+
+  const recordMutation = trpc.vaccination.record.useMutation({ onSuccess: onSuccessCommon })
+  const exemptMutation = trpc.vaccination.exempt.useMutation({ onSuccess: onSuccessCommon })
+  const isPending = recordMutation.isPending || exemptMutation.isPending
 
   const [mode, setMode] = useState<Mode>('vaccination')
   const [scheduleId, setScheduleId] = useState<string>('')
   const [vaccineId, setVaccineId] = useState<string>('')
-  const [date, setDate] = useState<string>(today())
+  const [date, setDate] = useState<string>(todayLocal())
   const [series, setSeries] = useState<string>('')
-  const [doseMl, setDoseMl] = useState<string>('0.5')
+  const [doseVolumeMl, setDoseVolumeMl] = useState<string>('0.5')
   const [doctorId, setDoctorId] = useState<string>('')
   const [result, setResult] = useState<string>('Реакции нет')
   const [exemptionTypeId, setExemptionTypeId] = useState<string>('')
-  const [exemptionUntil, setExemptionUntil] = useState<string>('') // TODO(api): medExemptionDateTo не поддержан
-  const [notes, setNotes] = useState<string>('') // TODO(api): note не поддержан record'ом
+  const [exemptionUntil, setExemptionUntil] = useState<string>('')
+  const [notes, setNotes] = useState<string>('')
   const [saved, setSaved] = useState(false)
+
+  // Поиск и фильтрация списка нозологий
+  const [scheduleSearch, setScheduleSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
 
   const patient = patientQ.data
   const schedules = schedulesQ.data
@@ -91,9 +129,6 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
   const doctors = doctorsQ.data
   const exemptionTypes = exemptionTypesQ.data
 
-  useEffect(() => {
-    if (!scheduleId && schedules?.[0]) setScheduleId(schedules[0].id)
-  }, [schedules, scheduleId])
   useEffect(() => {
     if (!doctorId && doctors?.[0]) setDoctorId(doctors[0].id)
   }, [doctors, doctorId])
@@ -111,17 +146,57 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
   )
   const display = schedule ? getScheduleDisplay(schedule) : { color: 'teal' as const, subtitle: '' }
 
-  const stats = useMemo(() => {
-    if (!schedules || !patient) return { overdue: 0, dueSoon: 0, total: 0 }
-    let overdue = 0
-    let dueSoon = 0
-    for (const s of schedules) {
-      const st = getScheduleStatus(s.id, patient.planItems, patient.vaccinationRecords)
-      if (st === 'overdue') overdue++
-      else if (st === 'due-soon') dueSoon++
-    }
-    return { overdue, dueSoon, total: patient.vaccinationRecords.length }
+  // Обогащённый список schedules со статусом для сортировки/фильтрации/рендера
+  const enrichedSchedules = useMemo(() => {
+    if (!schedules || !patient) return []
+    return schedules.map((s) => {
+      const status = getScheduleStatus(s.id, patient.planItems, patient.vaccinationRecords)
+      const last = getLastDose(s.id, patient.vaccinationRecords)
+      const disp = getScheduleDisplay(s)
+      return { schedule: s, status, lastDose: last, display: disp }
+    })
   }, [schedules, patient])
+
+  // Счётчики для табов
+  const statusCounts = useMemo(() => {
+    const c = { all: enrichedSchedules.length, overdue: 0, 'due-soon': 0, planned: 0, never: 0 }
+    for (const e of enrichedSchedules) {
+      if (e.status === 'overdue') c.overdue++
+      else if (e.status === 'due-soon') c['due-soon']++
+      else if (e.status === 'planned') c.planned++
+      else if (e.status === 'never') c.never++
+    }
+    return c
+  }, [enrichedSchedules])
+
+  // Отсортированный + отфильтрованный список
+  const visibleSchedules = useMemo(() => {
+    const needle = scheduleSearch.trim().toLowerCase()
+    return enrichedSchedules
+      .filter((e) => {
+        if (statusFilter !== 'all' && e.status !== statusFilter) return false
+        if (!needle) return true
+        return (
+          e.schedule.name.toLowerCase().includes(needle) ||
+          (e.schedule.key ?? '').toLowerCase().includes(needle) ||
+          (e.schedule.code ?? '').toLowerCase().includes(needle)
+        )
+      })
+      .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.schedule.name.localeCompare(b.schedule.name))
+  }, [enrichedSchedules, statusFilter, scheduleSearch])
+
+  // Авто-выбор первой записи в видимом списке, если ничего не выбрано
+  useEffect(() => {
+    if (!scheduleId && visibleSchedules[0]) setScheduleId(visibleSchedules[0].schedule.id)
+  }, [visibleSchedules, scheduleId])
+
+  const stats = useMemo(() => {
+    return {
+      overdue: statusCounts.overdue,
+      dueSoon: statusCounts['due-soon'],
+      total: patient?.vaccinationRecords.length ?? 0,
+    }
+  }, [statusCounts, patient])
 
   const lastDose = schedule
     ? getLastDose(schedule.id, patient?.vaccinationRecords)
@@ -143,27 +218,33 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
   const canSave =
     mode === 'vaccination'
       ? !!(scheduleId && vaccineId && date && series && doctorId)
-      : !!(scheduleId && date && exemptionTypeId && doctorId)
+      : !!(scheduleId && date && exemptionTypeId)
 
   const handleSave = async () => {
-    if (!canSave || saved) return
-    await recordMutation.mutateAsync({
-      patientId,
-      vaccineScheduleId: scheduleId,
-      vaccinationDate: new Date(date),
-      doctorId: doctorId || undefined,
-      ...(mode === 'vaccination'
-        ? {
-            vaccineId: vaccineId || undefined,
-            series: series || undefined,
-            doseNumber: doseMl ? parseFloat(doseMl) : undefined,
-            result: result || undefined,
-          }
-        : {
-            medExemptionTypeId: exemptionTypeId,
-            medExemptionDate: new Date(date),
-          }),
-    })
+    if (!canSave || saved || isPending) return
+    if (mode === 'vaccination') {
+      await recordMutation.mutateAsync({
+        patientId,
+        vaccineScheduleId: scheduleId,
+        vaccinationDate: parseLocalDate(date),
+        doctorId: doctorId || undefined,
+        vaccineId: vaccineId || undefined,
+        series: series || undefined,
+        doseVolumeMl: doseVolumeMl ? parseFloat(doseVolumeMl) : undefined,
+        result: result || undefined,
+        note: notes || undefined,
+      })
+    } else {
+      await exemptMutation.mutateAsync({
+        patientId,
+        vaccineScheduleId: scheduleId,
+        medExemptionTypeId: exemptionTypeId,
+        dateFrom: parseLocalDate(date),
+        dateTo: exemptionUntil ? parseLocalDate(exemptionUntil) : undefined,
+        note: notes || undefined,
+        doctorId: doctorId || undefined,
+      })
+    }
   }
 
   if (patientQ.isLoading || !patient) {
@@ -179,8 +260,6 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
 
   return (
     <div className="vt-vac">
-      <FormStyles />
-
       <div className="vt-vac-inner">
         {/* HEADER */}
         <div className="vt-vac-head">
@@ -224,6 +303,17 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
                   <InfoRow label="Группа риска" value={patient.riskGroup.name} badge="violet" />
                 )}
                 <InfoRow label="Телефон" value={patient.phone || '—'} mono />
+                {patient.activeMedExemption && (
+                  <InfoRow
+                    label="Медотвод"
+                    value={`${patient.activeMedExemption.medExemptionType.name}${
+                      patient.activeMedExemption.dateTo
+                        ? ' до ' + formatDateRu(patient.activeMedExemption.dateTo)
+                        : ' (бессрочно)'
+                    }`}
+                    badge="warn"
+                  />
+                )}
               </div>
             </div>
 
@@ -296,48 +386,87 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
               )}
             </div>
 
+            {/* ————— Список нозологий с поиском и фильтрами ————— */}
             <div className="vt-vac-schedule-section">
               <div className="vt-vac-schedule-head">
                 <span className="vt-label" style={{ margin: 0 }}>Нозология из нацкалендаря</span>
-                <div className="vt-vac-legend">
-                  <LegendDot color="var(--vt-cat-coral-deep)" label="просрочено" />
-                  <LegendDot color="var(--vt-cat-amber-deep)" label="скоро" />
-                  <LegendDot color="var(--vt-primary)" label="в плане" />
-                  <LegendDot color="var(--vt-cat-violet-deep)" label="не делали" />
+                <span className="vt-hint">{visibleSchedules.length} из {enrichedSchedules.length}</span>
+              </div>
+
+              <div className="vt-vac-schedule-controls">
+                <input
+                  className="vt-input vt-vac-search"
+                  placeholder="Поиск по названию или коду…"
+                  value={scheduleSearch}
+                  onChange={(e) => setScheduleSearch(e.target.value)}
+                />
+                <div className="vt-vac-tabs">
+                  {(
+                    [
+                      { k: 'all', label: 'Все', count: statusCounts.all, tone: 'neutral' },
+                      { k: 'overdue', label: 'Просрочено', count: statusCounts.overdue, tone: 'coral' },
+                      { k: 'due-soon', label: 'Скоро', count: statusCounts['due-soon'], tone: 'amber' },
+                      { k: 'planned', label: 'В плане', count: statusCounts.planned, tone: 'accent' },
+                      { k: 'never', label: 'Не делали', count: statusCounts.never, tone: 'violet' },
+                    ] as const
+                  ).map((t) => (
+                    <button
+                      key={t.k}
+                      type="button"
+                      className={`vt-vac-tab vt-vac-tab-${t.tone} ${statusFilter === t.k ? 'active' : ''}`}
+                      onClick={() => setStatusFilter(t.k as StatusFilter)}
+                    >
+                      {t.label}
+                      {t.count > 0 && <span className="vt-vac-tab-count">{t.count}</span>}
+                    </button>
+                  ))}
                 </div>
               </div>
 
               {schedulesQ.isLoading ? (
                 <div className="vt-loading">Загрузка нозологий…</div>
-              ) : schedules && schedules.length > 0 ? (
-                <div className="vt-vac-schedule-grid">
-                  {schedules.map((s) => {
-                    const d = getScheduleDisplay(s)
-                    const st = getScheduleStatus(s.id, patient.planItems, patient.vaccinationRecords)
+              ) : visibleSchedules.length === 0 ? (
+                <div className="vt-empty">
+                  {scheduleSearch ? 'Ничего не найдено по запросу' : 'Нет нозологий в этой категории'}
+                </div>
+              ) : (
+                <div className="vt-vac-list" role="listbox" aria-label="Нозологии">
+                  {visibleSchedules.map(({ schedule: s, status, lastDose: last, display: d }) => {
                     const active = scheduleId === s.id
                     return (
                       <button
                         key={s.id}
                         type="button"
-                        className={`vt-vac-card ${active ? 'active' : ''}`}
+                        role="option"
+                        aria-selected={active}
+                        className={`vt-vac-item ${active ? 'active' : ''}`}
                         data-cat={d.color}
+                        data-status={status}
                         onClick={() => {
                           setScheduleId(s.id)
-                          setVaccineId('') // сбросим, чтобы auto-select сработал
+                          setVaccineId('')
                         }}
                       >
-                        <div className="vt-vac-card-row">
-                          <div className="vt-display vt-vac-card-title">{s.name}</div>
-                          {active && <IconCheck size={15} />}
+                        <div className="vt-vac-item-main">
+                          <div className="vt-vac-item-title">
+                            {s.name}
+                            {s.key && <span className="vt-vac-item-key">{s.key}</span>}
+                          </div>
+                          {d.subtitle && <div className="vt-vac-item-sub">{d.subtitle}</div>}
                         </div>
-                        {d.subtitle && <div className="vt-vac-card-sub">{d.subtitle}</div>}
-                        <StatusPill status={st} />
+                        <div className="vt-vac-item-meta">
+                          {last && (
+                            <span className="vt-vac-item-last" title="Последняя запись">
+                              <IconClock size={11} /> {formatDateRu(last)}
+                            </span>
+                          )}
+                          <StatusPill status={status} />
+                          {active && <IconCheck size={14} />}
+                        </div>
                       </button>
                     )
                   })}
                 </div>
-              ) : (
-                <div className="vt-empty">Нет доступных нозологий</div>
               )}
             </div>
 
@@ -367,15 +496,15 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
                   <Field label="Доза, мл">
                     <input
                       className="vt-input vt-mono"
-                      value={doseMl}
-                      onChange={(e) => setDoseMl(e.target.value)}
+                      value={doseVolumeMl}
+                      onChange={(e) => setDoseVolumeMl(e.target.value)}
                     />
                   </Field>
                 </div>
 
                 <div className="vt-vac-cols-3">
                   <Field label="Дата">
-                    <input type="date" className="vt-input" value={date} onChange={(e) => setDate(e.target.value)} max={today()} />
+                    <input type="date" className="vt-input" value={date} onChange={(e) => setDate(e.target.value)} max={todayLocal()} />
                   </Field>
                   <Field label="Серия">
                     <input
@@ -486,11 +615,11 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
                 )}
                 <button
                   className={`vt-btn ${mode === 'exemption' ? 'vt-btn-danger' : 'vt-btn-primary'}`}
-                  disabled={!canSave || recordMutation.isPending || saved}
+                  disabled={!canSave || isPending || saved}
                   onClick={handleSave}
                   type="button"
                 >
-                  {recordMutation.isPending
+                  {isPending
                     ? 'Сохраняем…'
                     : mode === 'vaccination'
                       ? 'Записать прививку'
@@ -515,7 +644,7 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
                   <PreviewRow label="Препарат" value={currentVaccine?.name ?? '—'} strong />
                   <PreviewRow label="Дата" value={formatDateRu(date)} mono />
                   <PreviewRow label="Серия" value={series || '—'} mono />
-                  <PreviewRow label="Доза" value={`${doseMl} мл`} mono />
+                  <PreviewRow label="Доза" value={`${doseVolumeMl} мл`} mono />
                   <PreviewRow label="Тип" value={doseTypeLabel} accent />
                   {age != null && <PreviewRow label="Возраст" value={`${age} лет`} />}
                   <PreviewRow label="Врач" value={currentDoctor ? doctorName(currentDoctor) : '—'} />
@@ -573,7 +702,7 @@ function InfoRow({
   label: string
   value: string
   mono?: boolean
-  badge?: 'violet' | 'accent'
+  badge?: 'violet' | 'accent' | 'warn'
 }) {
   return (
     <div className="vt-vac-row">
@@ -613,15 +742,6 @@ function StatusPill({ status }: { status: ScheduleStatus }) {
   )
 }
 
-function LegendDot({ color, label }: { color: string; label: string }) {
-  return (
-    <span className="vt-vac-legend-item">
-      <span className="vt-vac-legend-dot" style={{ background: color }} />
-      {label}
-    </span>
-  )
-}
-
 function PreviewRow({
   label,
   value,
@@ -644,404 +764,5 @@ function PreviewRow({
         {value}
       </span>
     </div>
-  )
-}
-
-/* ——— scoped styles ——— */
-
-function FormStyles() {
-  return (
-    <style>{`
-      .vt-vac { min-height: 100vh; background: var(--vt-bg); }
-      .vt-vac-inner { max-width: 1280px; margin: 0 auto; padding: 28px 32px; }
-
-      .vt-vac-head {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        margin-bottom: 6px;
-      }
-      .vt-vac-title {
-        font-family: var(--vt-font-display);
-        font-size: 34px;
-        font-weight: 500;
-        margin: 0;
-        letter-spacing: -0.03em;
-      }
-      .vt-vac-title em { color: var(--vt-primary-hover); font-style: italic; }
-      .vt-vac-id {
-        font-family: var(--vt-font-mono);
-        font-size: 12px;
-        color: var(--vt-hint);
-        background: var(--vt-bg-warm);
-        padding: 3px 9px;
-        border-radius: 6px;
-      }
-      .vt-vac-date {
-        margin-left: auto;
-        font-family: var(--vt-font-mono);
-        font-size: 13px;
-        color: var(--vt-muted);
-      }
-      .vt-vac-sub {
-        color: var(--vt-muted);
-        margin: 0 0 28px;
-        font-size: 14px;
-      }
-
-      .vt-vac-grid {
-        display: grid;
-        grid-template-columns: 340px 1fr 320px;
-        gap: 22px;
-      }
-      @media (max-width: 1100px) {
-        .vt-vac-grid { grid-template-columns: 1fr; }
-      }
-
-      .vt-vac-aside { display: flex; flex-direction: column; gap: 14px; }
-
-      .vt-vac-patient {
-        background: linear-gradient(180deg, var(--vt-surface) 0%, var(--vt-surface-tint) 100%);
-        border: 1.5px solid var(--vt-border);
-        border-radius: 16px;
-        padding: 20px;
-      }
-      .vt-vac-patient-top {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 16px;
-      }
-      .vt-vac-avatar-lg { width: 50px; height: 50px; font-size: 16px; }
-      .vt-vac-patient-name-wrap { flex: 1; min-width: 0; }
-      .vt-vac-patient-name {
-        font-size: 17px;
-        font-weight: 500;
-        line-height: 1.2;
-        letter-spacing: -0.01em;
-      }
-      .vt-vac-patient-meta { font-size: 13px; color: var(--vt-muted); margin-top: 2px; }
-
-      .vt-vac-stats { display: flex; gap: 6px; margin-bottom: 16px; }
-      .vt-vac-stat { flex: 1; padding: 10px 12px; border-radius: 10px; display: flex; flex-direction: column; gap: 2px; }
-      .vt-vac-stat-value { font-size: 20px; font-weight: 600; line-height: 1; }
-      .vt-vac-stat-label {
-        font-size: 10px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        opacity: 0.8;
-      }
-      .vt-vac-stat-coral { background: var(--vt-danger-bg); color: var(--vt-danger-text); }
-      .vt-vac-stat-amber { background: var(--vt-warning-bg); color: var(--vt-warning-text); }
-      .vt-vac-stat-accent { background: var(--vt-accent-bg); color: var(--vt-accent-text); }
-
-      .vt-vac-rows { display: grid; gap: 9px; font-size: 13px; }
-      .vt-vac-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-      .vt-vac-row > span:first-child { font-size: 12px; }
-
-      .vt-vac-history { padding: 20px; }
-      .vt-vac-history-head { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; color: var(--vt-muted); }
-      .vt-vac-timeline { position: relative; padding-left: 16px; }
-      .vt-vac-timeline-rail {
-        position: absolute;
-        left: 4px;
-        top: 8px;
-        bottom: 8px;
-        width: 2px;
-        background: linear-gradient(180deg, var(--vt-primary) 0%, var(--vt-border) 100%);
-        border-radius: 2px;
-      }
-      .vt-vac-timeline-item { position: relative; margin-bottom: 14px; }
-      .vt-vac-timeline-item:last-child { margin-bottom: 0; }
-      .vt-vac-timeline-dot {
-        position: absolute;
-        left: -16px;
-        top: 4px;
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background: var(--dot, var(--vt-primary));
-        border: 2px solid var(--vt-surface);
-        box-shadow: 0 0 0 2px color-mix(in srgb, var(--dot, var(--vt-primary)) 25%, transparent);
-      }
-      .vt-vac-timeline-title { font-size: 13px; font-weight: 500; }
-      .vt-vac-timeline-meta {
-        font-size: 11px;
-        color: var(--vt-hint);
-        margin-top: 2px;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      .vt-vac-toggle-row { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; }
-      .vt-vac-mode {
-        display: inline-flex;
-        background: var(--vt-bg-warm);
-        padding: 4px;
-        border-radius: 12px;
-        gap: 2px;
-      }
-      .vt-vac-mode button {
-        background: transparent;
-        border: none;
-        padding: 9px 18px;
-        font-family: inherit;
-        font-size: 14px;
-        font-weight: 500;
-        color: var(--vt-muted);
-        border-radius: 9px;
-        cursor: pointer;
-        transition: all 0.15s;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-      }
-      .vt-vac-mode button.on {
-        background: linear-gradient(180deg, var(--vt-surface) 0%, var(--vt-surface-tint) 100%);
-        color: var(--vt-primary-hover);
-        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-      }
-      .vt-vac-mode button.on-exempt {
-        background: linear-gradient(180deg, var(--vt-surface) 0%, var(--vt-danger-bg) 100%);
-        color: var(--vt-danger-text);
-        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-      }
-      .vt-vac-exempt-hint {
-        font-size: 13px;
-        color: var(--vt-danger-text);
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-weight: 500;
-      }
-
-      .vt-vac-schedule-section { margin-bottom: 22px; }
-      .vt-vac-schedule-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 10px;
-      }
-      .vt-vac-legend { display: flex; gap: 10px; font-size: 11px; color: var(--vt-muted); }
-      .vt-vac-legend-item { display: inline-flex; align-items: center; gap: 4px; }
-      .vt-vac-legend-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
-
-      .vt-vac-schedule-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 10px;
-      }
-      @media (max-width: 900px) {
-        .vt-vac-schedule-grid { grid-template-columns: repeat(2, 1fr); }
-      }
-
-      .vt-vac-card {
-        text-align: left;
-        background: var(--vt-surface);
-        border: 1.5px solid var(--vt-border);
-        border-radius: 14px;
-        padding: 14px 16px;
-        cursor: pointer;
-        transition: all 0.18s cubic-bezier(.4,0,.2,1);
-        position: relative;
-        overflow: hidden;
-        font-family: inherit;
-      }
-      .vt-vac-card::before {
-        content: '';
-        position: absolute;
-        left: 0; top: 0; bottom: 0;
-        width: 4px;
-        transition: width 0.18s ease;
-      }
-      .vt-vac-card[data-cat="amber"]::before { background: var(--vt-cat-amber-deep); }
-      .vt-vac-card[data-cat="teal"]::before { background: var(--vt-cat-teal-deep); }
-      .vt-vac-card[data-cat="coral"]::before { background: var(--vt-cat-coral-deep); }
-      .vt-vac-card[data-cat="violet"]::before { background: var(--vt-cat-violet-deep); }
-      .vt-vac-card[data-cat="blue"]::before { background: var(--vt-cat-blue-deep); }
-      .vt-vac-card[data-cat="rose"]::before { background: var(--vt-cat-rose-deep); }
-
-      .vt-vac-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px -4px rgba(0,0,0,0.06); }
-      .vt-vac-card:hover::before { width: 6px; }
-      .vt-vac-card.active::before { width: 6px; }
-      .vt-vac-card.active[data-cat="amber"] { background: var(--vt-cat-amber-tint); border-color: var(--vt-cat-amber-border); }
-      .vt-vac-card.active[data-cat="teal"] { background: var(--vt-cat-teal-tint); border-color: var(--vt-cat-teal-border); }
-      .vt-vac-card.active[data-cat="coral"] { background: var(--vt-cat-coral-tint); border-color: var(--vt-cat-coral-border); }
-      .vt-vac-card.active[data-cat="violet"] { background: var(--vt-cat-violet-tint); border-color: var(--vt-cat-violet-border); }
-      .vt-vac-card.active[data-cat="blue"] { background: var(--vt-cat-blue-tint); border-color: var(--vt-cat-blue-border); }
-      .vt-vac-card.active[data-cat="rose"] { background: var(--vt-cat-rose-tint); border-color: var(--vt-cat-rose-border); }
-
-      .vt-vac-card-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; color: var(--vt-primary-hover); }
-      .vt-vac-card-title { font-size: 16px; font-weight: 600; color: var(--vt-text); letter-spacing: -0.01em; }
-      .vt-vac-card-sub { font-size: 11px; color: var(--vt-muted); margin-bottom: 10px; }
-
-      .vt-vac-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        padding: 3px 10px;
-        border-radius: 999px;
-        font-size: 11px;
-        font-weight: 600;
-      }
-      .vt-vac-pill-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
-      .vt-vac-pill-overdue { background: var(--vt-danger-bg); color: var(--vt-danger-text); }
-      .vt-vac-pill-overdue .vt-vac-pill-dot { background: var(--vt-cat-coral-deep); }
-      .vt-vac-pill-due-soon { background: var(--vt-warning-bg); color: var(--vt-warning-text); }
-      .vt-vac-pill-due-soon .vt-vac-pill-dot { background: var(--vt-cat-amber-deep); }
-      .vt-vac-pill-planned { background: var(--vt-accent-bg); color: var(--vt-accent-text); }
-      .vt-vac-pill-planned .vt-vac-pill-dot { background: var(--vt-primary); }
-      .vt-vac-pill-never { background: var(--vt-violet-bg); color: var(--vt-violet-text); }
-      .vt-vac-pill-never .vt-vac-pill-dot { background: var(--vt-cat-violet-deep); }
-
-      .vt-vac-form {
-        padding: 22px;
-        display: grid;
-        gap: 18px;
-      }
-      .vt-vac-form-head {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 12px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-      }
-      .vt-vac-form[data-cat="amber"] .vt-vac-form-head { color: var(--vt-cat-amber-text); }
-      .vt-vac-form[data-cat="teal"] .vt-vac-form-head { color: var(--vt-cat-teal-text); }
-      .vt-vac-form[data-cat="coral"] .vt-vac-form-head { color: var(--vt-cat-coral-text); }
-      .vt-vac-form[data-cat="violet"] .vt-vac-form-head { color: var(--vt-cat-violet-text); }
-      .vt-vac-form[data-cat="blue"] .vt-vac-form-head { color: var(--vt-cat-blue-text); }
-      .vt-vac-form[data-cat="rose"] .vt-vac-form-head { color: var(--vt-cat-rose-text); }
-
-      .vt-vac-form-exempt { border-color: var(--vt-danger-border); }
-      .vt-vac-exempt-note {
-        background: linear-gradient(135deg, var(--vt-danger-bg) 0%, var(--vt-warning-bg) 100%);
-        border: 1.5px solid var(--vt-danger-border);
-        border-radius: 12px;
-        padding: 14px;
-        display: flex;
-        gap: 10px;
-        align-items: flex-start;
-        color: var(--vt-danger-text);
-        font-size: 13px;
-        line-height: 1.5;
-      }
-
-      .vt-vac-field { display: flex; flex-direction: column; }
-      .vt-vac-cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-      .vt-vac-cols-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
-      .vt-vac-cols-2-tight { display: grid; grid-template-columns: 1fr 120px; gap: 12px; }
-      .vt-vac-cols-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-
-      .vt-vac-select-accent {
-        background-color: var(--vt-surface-tint);
-      }
-      .vt-vac-readonly {
-        background-color: var(--vt-surface-tint);
-        font-weight: 500;
-      }
-
-      .vt-vac-footer {
-        margin-top: 22px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-      }
-      .vt-vac-footer-hint {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 13px;
-        color: var(--vt-muted);
-      }
-      .vt-vac-footer-actions { display: flex; gap: 10px; align-items: center; }
-      .vt-vac-toast {
-        font-size: 13px;
-        color: var(--vt-accent-text);
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-weight: 600;
-        background: var(--vt-accent-bg);
-        padding: 8px 12px;
-        border-radius: 8px;
-      }
-
-      .vt-vac-preview { position: sticky; top: 20px; overflow: hidden; padding: 0; }
-      .vt-vac-preview-head {
-        padding: 12px 20px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 12px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        border-bottom: 1.5px solid var(--vt-border);
-      }
-      .vt-vac-preview[data-cat="amber"] .vt-vac-preview-head { background: linear-gradient(90deg, var(--vt-cat-amber-tint), var(--vt-cat-amber-bg)); color: var(--vt-cat-amber-text); border-bottom-color: var(--vt-cat-amber-border); }
-      .vt-vac-preview[data-cat="teal"] .vt-vac-preview-head { background: linear-gradient(90deg, var(--vt-cat-teal-tint), var(--vt-cat-teal-bg)); color: var(--vt-cat-teal-text); border-bottom-color: var(--vt-cat-teal-border); }
-      .vt-vac-preview[data-cat="coral"] .vt-vac-preview-head { background: linear-gradient(90deg, var(--vt-cat-coral-tint), var(--vt-cat-coral-bg)); color: var(--vt-cat-coral-text); border-bottom-color: var(--vt-cat-coral-border); }
-      .vt-vac-preview[data-cat="violet"] .vt-vac-preview-head { background: linear-gradient(90deg, var(--vt-cat-violet-tint), var(--vt-cat-violet-bg)); color: var(--vt-cat-violet-text); border-bottom-color: var(--vt-cat-violet-border); }
-      .vt-vac-preview[data-cat="blue"] .vt-vac-preview-head { background: linear-gradient(90deg, var(--vt-cat-blue-tint), var(--vt-cat-blue-bg)); color: var(--vt-cat-blue-text); border-bottom-color: var(--vt-cat-blue-border); }
-      .vt-vac-preview[data-cat="rose"] .vt-vac-preview-head { background: linear-gradient(90deg, var(--vt-cat-rose-tint), var(--vt-cat-rose-bg)); color: var(--vt-cat-rose-text); border-bottom-color: var(--vt-cat-rose-border); }
-
-      .vt-vac-preview-body { padding: 16px 20px 0; font-size: 13px; line-height: 1.6; }
-      .vt-vac-preview-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        gap: 8px;
-        margin-bottom: 7px;
-        padding-bottom: 7px;
-        border-bottom: 1px dotted var(--vt-border);
-      }
-      .vt-vac-preview-label {
-        color: var(--vt-hint);
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        font-weight: 500;
-      }
-      .vt-vac-preview-value {
-        text-align: right;
-        color: var(--vt-text);
-        font-size: 13px;
-        font-weight: 500;
-      }
-      .vt-vac-preview-value.strong { font-weight: 600; }
-      .vt-vac-preview-value.accent { font-weight: 600; }
-      .vt-vac-preview[data-cat="amber"] .vt-vac-preview-value.accent { color: var(--vt-cat-amber-text); }
-      .vt-vac-preview[data-cat="teal"] .vt-vac-preview-value.accent { color: var(--vt-cat-teal-text); }
-      .vt-vac-preview[data-cat="coral"] .vt-vac-preview-value.accent { color: var(--vt-cat-coral-text); }
-      .vt-vac-preview[data-cat="violet"] .vt-vac-preview-value.accent { color: var(--vt-cat-violet-text); }
-      .vt-vac-preview[data-cat="blue"] .vt-vac-preview-value.accent { color: var(--vt-cat-blue-text); }
-      .vt-vac-preview[data-cat="rose"] .vt-vac-preview-value.accent { color: var(--vt-cat-rose-text); }
-
-      .vt-vac-next {
-        margin: 14px 20px 20px;
-        padding: 12px;
-        background: var(--vt-surface-tint);
-        border-radius: 10px;
-        border: 1px dashed var(--vt-border-strong);
-        font-size: 12px;
-        line-height: 1.5;
-      }
-      .vt-vac-next-label {
-        font-weight: 600;
-        color: var(--vt-primary-hover);
-        margin-bottom: 5px;
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-      }
-    `}</style>
   )
 }

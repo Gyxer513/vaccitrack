@@ -3,7 +3,7 @@
 
 export type CategoryColor = 'amber' | 'teal' | 'coral' | 'violet' | 'blue' | 'rose'
 
-export type ScheduleStatus = 'overdue' | 'due-soon' | 'planned' | 'never'
+export type ScheduleStatus = 'overdue' | 'due-soon' | 'planned' | 'exempt' | 'done' | 'never'
 
 export type ScheduleDisplay = {
   color: CategoryColor
@@ -34,7 +34,19 @@ export const STATUS_LABEL: Record<ScheduleStatus, string> = {
   overdue: 'просрочено',
   'due-soon': 'скоро',
   planned: 'в плане',
+  exempt: 'медотвод',
+  done: 'выполнено',
   never: 'не делали',
+}
+
+// Порядок приоритета для сортировки: что важнее показать медику сначала.
+export const STATUS_ORDER: Record<ScheduleStatus, number> = {
+  overdue: 0,
+  'due-soon': 1,
+  planned: 2,
+  never: 3,
+  exempt: 4,
+  done: 5,
 }
 
 type PlanItemLike = { vaccineScheduleId: string; status: string; plannedDate: Date | string }
@@ -52,10 +64,11 @@ export function getScheduleStatus(
       const days = (new Date(plan.plannedDate).getTime() - Date.now()) / 86_400_000
       return days <= 30 ? 'due-soon' : 'planned'
     }
-    if (plan.status === 'EXEMPTED' || plan.status === 'DONE') return 'planned'
+    if (plan.status === 'EXEMPTED') return 'exempt'
+    if (plan.status === 'DONE') return 'done'
   }
   const hasRecord = records?.some((r) => r.vaccineScheduleId === scheduleId)
-  return hasRecord ? 'planned' : 'never'
+  return hasRecord ? 'done' : 'never'
 }
 
 export function getLastDose(

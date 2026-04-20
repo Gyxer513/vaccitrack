@@ -71,6 +71,7 @@ export const patientRouter = router({
           district: true,
           riskGroup: true,
           insurance: true,
+          activeMedExemption: { include: { medExemptionType: true } },
           medExemptions: {
             include: { medExemptionType: true },
             orderBy: { dateFrom: 'desc' },

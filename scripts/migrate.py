@@ -96,8 +96,10 @@ def migrate(dbf_dir: str, dsn: str):
     conn.autocommit = False
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-    org_id = str(uuid.uuid4())
-    site_id = str(uuid.uuid4())
+    # Фиксированный UUID, чтобы dev-фолбэк API (DEV_ORG_ID в apps/api/.env)
+    # указывал на ту же организацию после каждого reset+реимпорта.
+    org_id = '6c8295ee-eeea-429d-aa02-b4be3a964a8d'
+    site_id = '0b7a7b11-1111-4111-8111-111111111111'
     uch_map, medic_map, vaccin_map = {}, {}, {}
     motv_map, smo_map, risk_map = {}, {}, {}
     priv_map, person_map = {}, {}

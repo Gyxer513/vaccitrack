@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { trpc } from '../lib/trpc'
 import { format } from 'date-fns'
+import { Pagination } from '../components/ui/Pagination'
 
 function ageLabel(birthday: Date | string) {
   const bd = new Date(birthday)
@@ -118,19 +119,14 @@ export function PatientsPage() {
 
             {data.pages > 1 && (
               <div className="vt-pagination">
-                <span>Страница {page} из {data.pages}</span>
-                <div className="vt-pagination-ctrls">
-                  <button
-                    className="vt-btn vt-btn-icon"
-                    disabled={page === 1}
-                    onClick={() => setPage((p) => p - 1)}
-                  >←</button>
-                  <button
-                    className="vt-btn vt-btn-icon"
-                    disabled={page === data.pages}
-                    onClick={() => setPage((p) => p + 1)}
-                  >→</button>
-                </div>
+                <span>
+                  {(page - 1) * 50 + 1}–{Math.min(page * 50, data.total)} из {data.total}
+                </span>
+                <Pagination
+                  page={page}
+                  pages={data.pages}
+                  onChange={setPage}
+                />
               </div>
             )}
           </>

@@ -416,6 +416,44 @@ html, body, #root {
 .vt-vac-pill-never .vt-vac-pill-dot { background: var(--vt-cat-violet-deep); }
 
 /* ————— Pagination ————— */
+.vt-pager { display: inline-flex; align-items: center; gap: 4px; }
+.vt-pager-btn {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1.5px solid transparent;
+  background: transparent;
+  color: var(--vt-muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all .12s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.vt-pager-btn:hover:not(:disabled) {
+  background: var(--vt-bg-warm);
+  color: var(--vt-text);
+}
+.vt-pager-btn.active {
+  background: var(--vt-primary);
+  color: var(--vt-surface);
+  border-color: var(--vt-primary);
+  cursor: default;
+}
+.vt-pager-btn.active:hover { background: var(--vt-primary); }
+.vt-pager-btn:disabled { opacity: .35; cursor: not-allowed; }
+.vt-pager-gap {
+  min-width: 24px;
+  text-align: center;
+  color: var(--vt-hint);
+  font-size: 13px;
+  user-select: none;
+}
+
 .vt-pagination {
   display: flex;
   align-items: center;

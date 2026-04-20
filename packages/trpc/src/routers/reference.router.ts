@@ -33,4 +33,12 @@ export const referenceRouter = router({
       orderBy: [{ lastName: 'asc' }],
     }),
   ),
+
+  insurances: protectedProcedure.query(({ ctx }) =>
+    ctx.prisma.insuranceCompany.findMany({ orderBy: { name: 'asc' } }),
+  ),
+
+  riskGroups: protectedProcedure.query(({ ctx }) =>
+    ctx.prisma.riskGroup.findMany({ orderBy: { name: 'asc' } }),
+  ),
 })

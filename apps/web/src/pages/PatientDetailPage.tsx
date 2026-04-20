@@ -1,20 +1,21 @@
+import { useMemo } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { trpc } from '../lib/trpc'
 import { format, differenceInMonths, differenceInYears } from 'date-fns'
 
-const STATUS_LABELS: Record<string, string> = {
+const STATUS_LABEL: Record<string, string> = {
   PLANNED: 'Запланировано',
   OVERDUE: 'Просрочено',
   DONE: 'Выполнено',
   EXEMPTED: 'Медотвод',
   REFUSED: 'Отказ',
 }
-const STATUS_COLORS: Record<string, string> = {
-  PLANNED: 'bg-blue-100 text-blue-700',
-  OVERDUE: 'bg-red-100 text-red-700',
-  DONE: 'bg-green-100 text-green-700',
-  EXEMPTED: 'bg-amber-100 text-amber-700',
-  REFUSED: 'bg-gray-100 text-gray-600',
+const STATUS_PILL: Record<string, string> = {
+  PLANNED: 'vt-vac-pill-planned',
+  OVERDUE: 'vt-vac-pill-overdue',
+  DONE: 'vt-vac-pill-done',
+  EXEMPTED: 'vt-vac-pill-exempt',
+  REFUSED: 'vt-vac-pill-never',
 }
 
 function formatAge(birthday: string | Date) {
@@ -26,52 +27,129 @@ function formatAge(birthday: string | Date) {
   return `${months} мес.`
 }
 
+function ageAt(birthday: string | Date, at: string | Date) {
+  const bd = new Date(birthday)
+  const d = new Date(at)
+  const y = differenceInYears(d, bd)
+  if (y >= 1) return `${y} ${y === 1 ? 'год' : y < 5 ? 'года' : 'лет'}`
+  const m = differenceInMonths(d, bd)
+  return `${m} мес.`
+}
+
+// Записи в FoxPro хранятся по одной на каждую защищаемую нозологию.
+// Одна инъекция Пентаксима = 5 строк. Группируем по реальной инъекции.
+type RawRecord = {
+  id: string
+  vaccinationDate: string | Date
+  doseVolumeMl: number | null
+  doseNumber: number | null
+  series: string | null
+  result: string | null
+  note: string | null
+  vaccineId: string | null
+  vaccine: { id: string; name: string; producer: string | null } | null
+  vaccineSchedule: { id: string; name: string; key: string | null } | null
+  doctor: { lastName: string; firstName: string; middleName: string | null } | null
+  medExemptionTypeId: string | null
+}
+
+type Injection = {
+  key: string
+  date: Date
+  vaccineName: string
+  producer: string | null
+  series: string | null
+  doseMl: number | null
+  doctor: RawRecord['doctor']
+  schedules: { id: string; name: string; key: string | null }[]
+  isExemption: boolean
+}
+
+function groupInjections(records: RawRecord[]): Injection[] {
+  const groups = new Map<string, Injection>()
+  for (const r of records) {
+    const dateStr = format(new Date(r.vaccinationDate), 'yyyy-MM-dd')
+    const vaccineKey = r.vaccineId ?? 'none'
+    const seriesKey = r.series ?? 'none'
+    const key = `${dateStr}|${vaccineKey}|${seriesKey}`
+    const existing = groups.get(key)
+    if (existing) {
+      if (r.vaccineSchedule && !existing.schedules.some((s) => s.id === r.vaccineSchedule!.id)) {
+        existing.schedules.push(r.vaccineSchedule)
+      }
+    } else {
+      groups.set(key, {
+        key,
+        date: new Date(r.vaccinationDate),
+        vaccineName: r.vaccine?.name ?? '—',
+        producer: r.vaccine?.producer ?? null,
+        series: r.series,
+        doseMl: r.doseVolumeMl ?? null,
+        doctor: r.doctor,
+        schedules: r.vaccineSchedule ? [r.vaccineSchedule] : [],
+        isExemption: !!r.medExemptionTypeId,
+      })
+    }
+  }
+  return Array.from(groups.values()).sort((a, b) => b.date.getTime() - a.date.getTime())
+}
+
+const doctorShort = (d: RawRecord['doctor']) =>
+  d ? `${d.lastName} ${d.firstName[0] ?? ''}.${d.middleName?.[0] ? d.middleName[0] + '.' : ''}`.trim() : '—'
+
 export function PatientDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data: patient, isLoading } = trpc.patient.getById.useQuery({ id: id! })
 
-  if (isLoading) return <div className="text-center py-12 text-gray-500">Загрузка...</div>
-  if (!patient) return <div className="text-center py-12 text-red-500">Пациент не найден</div>
+  const injections = useMemo(
+    () => (patient ? groupInjections(patient.vaccinationRecords as RawRecord[]) : []),
+    [patient],
+  )
+
+  if (isLoading) return <div className="vt-loading">Загрузка…</div>
+  if (!patient) return <div className="vt-empty">Пациент не найден</div>
 
   const fullName = `${patient.lastName} ${patient.firstName} ${patient.middleName ?? ''}`.trim()
 
   return (
-    <div className="space-y-6">
-      {/* Шапка */}
-      <div className="flex items-start justify-between">
+    <div style={{ display: 'grid', gap: 22 }}>
+      {/* HEADER */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
         <div>
-          <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-            <Link to="/patients" className="hover:text-gray-700">← Пациенты</Link>
+          <div style={{ fontSize: 13, marginBottom: 6 }}>
+            <Link to="/patients" className="vt-muted" style={{ textDecoration: 'none' }}>← Пациенты</Link>
           </div>
-          <h1 className="text-xl font-semibold text-gray-900">{fullName}</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="vt-page-title">{fullName}</h1>
+          <p className="vt-page-sub">
             {format(new Date(patient.birthday), 'dd.MM.yyyy')}
             {' · '}{formatAge(patient.birthday)}
             {' · '}{patient.sex === 'MALE' ? 'Муж.' : 'Жен.'}
             {' · '}Участок: {patient.district?.code ?? '—'}
           </p>
           {patient.activeMedExemption && (
-            <span className="inline-flex mt-1 px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800">
-              Медотвод: {patient.activeMedExemption.medExemptionType.name}
-              {patient.activeMedExemption.dateTo
-                ? ` до ${format(new Date(patient.activeMedExemption.dateTo), 'dd.MM.yyyy')}`
-                : ' (бессрочно)'}
-            </span>
+            <div style={{ marginTop: 8 }}>
+              <span className="vt-badge vt-badge-warn">
+                Медотвод: {patient.activeMedExemption.medExemptionType.name}
+                {patient.activeMedExemption.dateTo
+                  ? ` до ${format(new Date(patient.activeMedExemption.dateTo), 'dd.MM.yyyy')}`
+                  : ' (бессрочно)'}
+              </span>
+            </div>
           )}
         </div>
-        <div className="flex gap-2">
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           <button
             onClick={() => navigate(`/vaccination/new?patientId=${id}`)}
-            className="bg-green-700 text-white text-sm px-4 py-2 rounded-md hover:bg-green-800 font-medium"
+            className="vt-btn vt-btn-primary"
           >
-            💉 Записать прививку
+            Записать прививку
           </button>
           <a
             href={`/api/v1/documents/patients/${id}/form063u`}
             target="_blank"
             rel="noreferrer"
-            className="text-sm border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50"
+            className="vt-btn vt-btn-ghost"
           >
             063/у ↓
           </a>
@@ -79,53 +157,78 @@ export function PatientDetailPage() {
             href={`/api/v1/documents/patients/${id}/certificate`}
             target="_blank"
             rel="noreferrer"
-            className="text-sm border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50"
+            className="vt-btn vt-btn-ghost"
           >
             Сертификат ↓
           </a>
         </div>
       </div>
 
-      {/* Журнал прививок */}
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-          <span className="font-medium text-gray-900">
-            Журнал прививок ({patient.vaccinationRecords.length})
+      {/* ЖУРНАЛ */}
+      <div className="vt-card">
+        <div style={{
+          padding: '14px 20px',
+          borderBottom: '1px solid var(--vt-border)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <span className="vt-section-title" style={{ margin: 0 }}>
+            Журнал прививок
+          </span>
+          <span className="vt-hint">
+            {injections.length} {injections.length === 1 ? 'инъекция' : 'инъекций'} · {patient.vaccinationRecords.length} записей о нозологиях
           </span>
         </div>
-        {patient.vaccinationRecords.length === 0 ? (
-          <div className="px-4 py-8 text-gray-400 text-sm text-center">
+        {injections.length === 0 ? (
+          <div className="vt-empty">
             Прививок нет —{' '}
             <button
               onClick={() => navigate(`/vaccination/new?patientId=${id}`)}
-              className="text-blue-600 hover:underline"
+              className="vt-link"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
             >
               записать первую
             </button>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
+          <table className="vt-table">
+            <thead>
               <tr>
-                {['Прививка', 'Доза', 'Дата', 'Возраст', 'Препарат', 'Серия', 'Врач'].map((h) => (
-                  <th key={h} className="text-left px-4 py-2 text-gray-600 font-medium">{h}</th>
-                ))}
+                <th>Дата</th>
+                <th>Возраст</th>
+                <th>Препарат</th>
+                <th>Серия</th>
+                <th>Защищает от</th>
+                <th>Доза</th>
+                <th>Врач</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {patient.vaccinationRecords.map((r) => (
-                <tr key={r.id} className={r.medExemptionTypeId ? 'bg-amber-50' : ''}>
-                  <td className="px-4 py-2">{r.vaccineSchedule?.name ?? '—'}</td>
-                  <td className="px-4 py-2 text-gray-500">{r.vaccineSchedule?.key ?? '—'}</td>
-                  <td className="px-4 py-2">{format(new Date(r.vaccinationDate), 'dd.MM.yyyy')}</td>
-                  <td className="px-4 py-2 text-gray-500 text-xs">
-                    {r.ageYears > 0 ? `${r.ageYears}л ` : ''}{r.ageMonths}м
+            <tbody>
+              {injections.map((inj) => (
+                <tr key={inj.key}>
+                  <td className="vt-mono">{format(inj.date, 'dd.MM.yyyy')}</td>
+                  <td className="vt-muted">{ageAt(patient.birthday, inj.date)}</td>
+                  <td>
+                    <div style={{ fontWeight: 500 }}>{inj.vaccineName}</div>
+                    {inj.producer && <div className="vt-hint">{inj.producer}</div>}
                   </td>
-                  <td className="px-4 py-2 text-gray-600">{r.vaccine?.name ?? '—'}</td>
-                  <td className="px-4 py-2 text-gray-500">{r.series ?? '—'}</td>
-                  <td className="px-4 py-2 text-gray-500">
-                    {r.doctor ? `${r.doctor.lastName} ${r.doctor.firstName[0]}.` : '—'}
+                  <td className="vt-mono vt-muted">{inj.series ?? '—'}</td>
+                  <td>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {inj.schedules.length === 0 ? (
+                        <span className="vt-hint">—</span>
+                      ) : (
+                        inj.schedules.map((s) => (
+                          <span key={s.id} className="vt-badge vt-badge-accent" title={s.name}>
+                            {s.name}
+                          </span>
+                        ))
+                      )}
+                    </div>
                   </td>
+                  <td className="vt-mono vt-muted">{inj.doseMl ? `${inj.doseMl} мл` : '—'}</td>
+                  <td className="vt-muted">{doctorShort(inj.doctor)}</td>
                 </tr>
               ))}
             </tbody>
@@ -133,28 +236,29 @@ export function PatientDetailPage() {
         )}
       </div>
 
-      {/* План */}
+      {/* ПЛАН */}
       {patient.planItems.length > 0 && (
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="px-4 py-3 border-b border-gray-200 font-medium text-gray-900">
-            План прививок
+        <div className="vt-card">
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--vt-border)' }}>
+            <span className="vt-section-title" style={{ margin: 0 }}>План прививок</span>
           </div>
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
+          <table className="vt-table">
+            <thead>
               <tr>
-                {['Прививка', 'Плановая дата', 'Статус'].map((h) => (
-                  <th key={h} className="text-left px-4 py-2 text-gray-600 font-medium">{h}</th>
-                ))}
+                <th>Прививка</th>
+                <th>Плановая дата</th>
+                <th>Статус</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {patient.planItems.map((item) => (
                 <tr key={item.id}>
-                  <td className="px-4 py-2">{item.vaccineSchedule.name}</td>
-                  <td className="px-4 py-2">{format(new Date(item.plannedDate), 'dd.MM.yyyy')}</td>
-                  <td className="px-4 py-2">
-                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[item.status]}`}>
-                      {STATUS_LABELS[item.status]}
+                  <td>{item.vaccineSchedule.name}</td>
+                  <td className="vt-mono">{format(new Date(item.plannedDate), 'dd.MM.yyyy')}</td>
+                  <td>
+                    <span className={`vt-vac-pill ${STATUS_PILL[item.status] ?? ''}`}>
+                      <span className="vt-vac-pill-dot" />
+                      {STATUS_LABEL[item.status] ?? item.status}
                     </span>
                   </td>
                 </tr>

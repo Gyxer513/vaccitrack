@@ -324,49 +324,72 @@ def migrate(dbf_dir: str, dsn: str):
         print(f"   {patient_count} пациентов")
 
         # 12. VaccinationRecord (есть createdAt/updatedAt)
-        print("12/12 VaccinationRecord (T_NOZ1)...")
-        _, noz1s = read_dbf(str(p / 'T_NOZ1.dbf'))
+        # В FoxPro прививки разбиты по нозологиям на отдельные таблицы T_NOZ1..T_NOZ18.
+        # Все с одинаковой структурой (record_size=185). T_NOZ20 — реакции на пробы
+        # (Манту/БЦЖ, формат 142 байта), T_NOZ0/T_NOZ30 — служебные: пока не импортируем.
+        print("12/12 VaccinationRecord (T_NOZ1..T_NOZ18)...")
+        noz_files = ['T_NOZ1.dbf', 'T_NOZ2.dbf', 'T_NOZ3.dbf', 'T_NOZ4.dbf', 'T_NOZ5.dbf',
+                     'T_NOZ6.dbf', 'T_NOZ7.dbf', 'T_NOZ8.dbf', 'T_NOZ9.dbf', 'T_NOZ10.dbf',
+                     'T_NOZ11.dbf', 'T_NOZ12.dbf', 'T_NOZ13.dbf', 'T_NOZ14.dbf', 'T_NOZ18.dbf']
         rec_count = 0
-        for row in noz1s:
-            patient_new = person_map.get(ii(row['ID_PERS']))
-            if not patient_new: continue
-            vac_date = row.get('DT_PRIV')
-            if not isinstance(vac_date, datetime.date): continue
-            cur.execute("""
-                INSERT INTO "VaccinationRecord" (
-                    id, "patientId", "vaccineScheduleId", "vaccineId", "doctorId",
-                    "isEpid", "isExternal", "ageYears", "ageMonths", "ageDays",
-                    "vaccinationDate", "doseNumber", series, "checkNumber", result,
-                    "medExemptionTypeId", "medExemptionDate", "nextScheduledDate",
-                    "createdAt", "updatedAt"
-                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW(),NOW())
-                ON CONFLICT DO NOTHING
-            """, (
-                str(uuid.uuid4()), patient_new,
-                priv_map.get(ii(row.get('ID_PRIV'))),
-                vaccin_map.get(ii(row.get('ID_VACCIN'))),
-                medic_map.get(ii(row.get('ID_DOCTOR'))),
-                bool(row.get('L_EPID', False)), bool(row.get('L_EXTR', False)),
-                int(row.get('GG') or 0), int(row.get('MM') or 0), int(row.get('DD') or 0),
-                vac_date,
-                float(row['PRV_DOZA']) if row.get('PRV_DOZA') else None,
-                ss(row.get('PRV_SER')), ss(row.get('CHECKN')),
-                ss(row.get('REZ_MED')) or ss(row.get('MARK')),
-                motv_map.get(ii(row.get('ID_MOTV'))) if ii(row.get('ID_MOTV')) else None,
-                row.get('DT_MOTV') if isinstance(row.get('DT_MOTV'), datetime.date) else None,
-                row.get('DT_NEXT') if isinstance(row.get('DT_NEXT'), datetime.date) else None,
-            ))
-            rec_count += 1
-        print(f"   {rec_count} записей вакцинации")
+        skipped_patient = 0
+        skipped_date = 0
+        per_file: dict[str, int] = {}
+        for fname in noz_files:
+            fpath = p / fname
+            if not fpath.exists():
+                continue
+            _, rows = read_dbf(str(fpath))
+            file_count = 0
+            for row in rows:
+                patient_new = person_map.get(ii(row.get('ID_PERS')))
+                if not patient_new:
+                    skipped_patient += 1
+                    continue
+                vac_date = row.get('DT_PRIV')
+                if not isinstance(vac_date, datetime.date):
+                    skipped_date += 1
+                    continue
+                cur.execute("""
+                    INSERT INTO "VaccinationRecord" (
+                        id, "patientId", "vaccineScheduleId", "vaccineId", "doctorId",
+                        "isEpid", "isExternal", "ageYears", "ageMonths", "ageDays",
+                        "vaccinationDate", "doseNumber", series, "checkNumber", result,
+                        "medExemptionTypeId", "medExemptionDate", "nextScheduledDate",
+                        "createdAt", "updatedAt"
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW(),NOW())
+                    ON CONFLICT DO NOTHING
+                """, (
+                    str(uuid.uuid4()), patient_new,
+                    priv_map.get(ii(row.get('ID_PRIV'))),
+                    vaccin_map.get(ii(row.get('ID_VACCIN'))),
+                    medic_map.get(ii(row.get('ID_DOCTOR'))),
+                    bool(row.get('L_EPID', False)), bool(row.get('L_EXTR', False)),
+                    int(row.get('GG') or 0), int(row.get('MM') or 0), int(row.get('DD') or 0),
+                    vac_date,
+                    float(row['PRV_DOZA']) if row.get('PRV_DOZA') else None,
+                    ss(row.get('PRV_SER')), ss(row.get('CHECKN')),
+                    ss(row.get('REZ_MED')) or ss(row.get('MARK')),
+                    motv_map.get(ii(row.get('ID_MOTV'))) if ii(row.get('ID_MOTV')) else None,
+                    row.get('DT_MOTV') if isinstance(row.get('DT_MOTV'), datetime.date) else None,
+                    row.get('DT_NEXT') if isinstance(row.get('DT_NEXT'), datetime.date) else None,
+                ))
+                rec_count += 1
+                file_count += 1
+            per_file[fname] = file_count
+        print(f"   {rec_count} записей вакцинации (пропущено: "
+              f"{skipped_patient} без пациента, {skipped_date} без даты)")
+        for fn, c in per_file.items():
+            print(f"     {fn}: {c}")
 
         conn.commit()
-        print("\n✅ Миграция завершена!")
+        print("\n[OK] Миграция завершена!")
         print(f"   Пациентов: {patient_count} | Вакцинаций: {rec_count}")
         print(f"   Вакцин: {len(vaccin_map)} | Нацкалендарь: {len(priv_map)} поз.")
 
     except Exception as e:
         conn.rollback()
-        print(f"\n❌ Ошибка: {e}")
+        print(f"\n[ERROR] Ошибка: {e}")
         import traceback; traceback.print_exc()
     finally:
         cur.close()

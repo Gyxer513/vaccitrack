@@ -77,7 +77,11 @@ export const patientRouter = router({
             orderBy: { dateFrom: 'desc' },
           },
           vaccinationRecords: {
-            include: { vaccine: true, vaccineSchedule: true, doctor: true },
+            include: {
+              vaccine: true,
+              vaccineSchedule: { include: { parent: true } },
+              doctor: true,
+            },
             orderBy: { vaccinationDate: 'desc' },
           },
           planItems: {

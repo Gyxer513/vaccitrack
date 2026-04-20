@@ -226,13 +226,19 @@ def migrate(dbf_dir: str, dsn: str):
                 row.get('DD') or 0, row.get('MM') or 0, row.get('GG') or 0,
                 row.get('LIM_DD') or 0, row.get('LIM_MM') or 0, row.get('LIM_GG') or 0,
             ))
-        # второй проход — parentId / nextScheduleId
+        # Второй проход — parentId / nextScheduleId.
+        # PARENT в T_PRIV ссылается по KEY_, не по ID_PRIV (например '1_' — это запись
+        # с KEY_='1_', ID_PRIV может быть другой). Собираем lookup KEY_ → new uuid.
+        priv_by_key: dict = {}
+        for pid, row in priv_rows.items():
+            k = ss(row.get('KEY_'))
+            if k:
+                priv_by_key[k] = priv_map[pid]
         for pid, row in priv_rows.items():
             my_id = priv_map[pid]
-            parent_raw = ss(row.get('PARENT'))
+            parent_key = ss(row.get('PARENT'))
             next_id_raw = ii(row.get('ID_NEXT'))
-            parent_priv_id = int(parent_raw.rstrip('_')) if parent_raw and parent_raw.rstrip('_').isdigit() else None
-            parent_new = priv_map.get(parent_priv_id) if parent_priv_id else None
+            parent_new = priv_by_key.get(parent_key) if parent_key else None
             next_new = priv_map.get(next_id_raw) if next_id_raw else None
             if parent_new or next_new:
                 cur.execute('UPDATE "VaccineSchedule" SET "parentId"=%s,"nextScheduleId"=%s WHERE id=%s',

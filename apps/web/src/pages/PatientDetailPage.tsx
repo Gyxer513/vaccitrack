@@ -38,6 +38,13 @@ function ageAt(birthday: string | Date, at: string | Date) {
 
 // Записи в FoxPro хранятся по одной на каждую защищаемую нозологию.
 // Одна инъекция Пентаксима = 5 строк. Группируем по реальной инъекции.
+type ScheduleInfo = {
+  id: string
+  name: string
+  key: string | null
+  parent: { id: string; name: string } | null
+}
+
 type RawRecord = {
   id: string
   vaccinationDate: string | Date
@@ -48,10 +55,12 @@ type RawRecord = {
   note: string | null
   vaccineId: string | null
   vaccine: { id: string; name: string; producer: string | null } | null
-  vaccineSchedule: { id: string; name: string; key: string | null } | null
+  vaccineSchedule: ScheduleInfo | null
   doctor: { lastName: string; firstName: string; middleName: string | null } | null
   medExemptionTypeId: string | null
 }
+
+type Disease = { id: string; name: string; doseLabel: string | null }
 
 type Injection = {
   key: string
@@ -61,8 +70,18 @@ type Injection = {
   series: string | null
   doseMl: number | null
   doctor: RawRecord['doctor']
-  schedules: { id: string; name: string; key: string | null }[]
+  diseases: Disease[]
   isExemption: boolean
+}
+
+// Имя нозологии живёт на parent-record в T_PRIV (например "Дифтерия"),
+// а сам vaccineSchedule — это этап ("Первая вакцинация"). Если parent есть —
+// используем его. Если нет (корневая запись сама нозология) — берём её name.
+function nosologyInfo(s: ScheduleInfo): Disease {
+  if (s.parent) {
+    return { id: s.parent.id, name: s.parent.name, doseLabel: s.name }
+  }
+  return { id: s.id, name: s.name, doseLabel: null }
 }
 
 function groupInjections(records: RawRecord[]): Injection[] {
@@ -73,9 +92,10 @@ function groupInjections(records: RawRecord[]): Injection[] {
     const seriesKey = r.series ?? 'none'
     const key = `${dateStr}|${vaccineKey}|${seriesKey}`
     const existing = groups.get(key)
+    const disease = r.vaccineSchedule ? nosologyInfo(r.vaccineSchedule) : null
     if (existing) {
-      if (r.vaccineSchedule && !existing.schedules.some((s) => s.id === r.vaccineSchedule!.id)) {
-        existing.schedules.push(r.vaccineSchedule)
+      if (disease && !existing.diseases.some((d) => d.id === disease.id)) {
+        existing.diseases.push(disease)
       }
     } else {
       groups.set(key, {
@@ -86,7 +106,7 @@ function groupInjections(records: RawRecord[]): Injection[] {
         series: r.series,
         doseMl: r.doseVolumeMl ?? null,
         doctor: r.doctor,
-        schedules: r.vaccineSchedule ? [r.vaccineSchedule] : [],
+        diseases: disease ? [disease] : [],
         isExemption: !!r.medExemptionTypeId,
       })
     }
@@ -216,12 +236,16 @@ export function PatientDetailPage() {
                   <td className="vt-mono vt-muted">{inj.series ?? '—'}</td>
                   <td>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                      {inj.schedules.length === 0 ? (
+                      {inj.diseases.length === 0 ? (
                         <span className="vt-hint">—</span>
                       ) : (
-                        inj.schedules.map((s) => (
-                          <span key={s.id} className="vt-badge vt-badge-accent" title={s.name}>
-                            {s.name}
+                        inj.diseases.map((d) => (
+                          <span
+                            key={d.id}
+                            className="vt-badge vt-badge-accent"
+                            title={d.doseLabel ? `${d.name} · ${d.doseLabel}` : d.name}
+                          >
+                            {d.name}
                           </span>
                         ))
                       )}

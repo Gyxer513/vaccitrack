@@ -23,8 +23,10 @@ const scheduleCreateInput = z.object({
 
 export const scheduleRouter = router({
   list: protectedProcedure.query(({ ctx }) =>
+    // Включаем неактивные тоже — корневые записи (сами нозологии) в FoxPro
+    // были L_PRIV=False, т.к. это не процедуры, а категории. UI сам
+    // фильтрует их где не нужны (в списке «Добавить процедуру»).
     ctx.prisma.vaccineSchedule.findMany({
-      where: { isActive: true },
       include: { parent: true },
       orderBy: [{ parentId: 'asc' }, { code: 'asc' }],
     }),

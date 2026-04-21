@@ -486,6 +486,8 @@ function AssignmentsTable({
 
   const linked = allSchedules.filter((s) => linkedIds.includes(s.id))
   const unlinked = allSchedules
+    // Корни (сами нозологии, без parent) — это категории, не процедуры. Не показываем.
+    .filter((s) => s.parent)
     .filter((s) => !linkedIds.includes(s.id))
     .filter((s) => {
       const needle = q.trim().toLowerCase()

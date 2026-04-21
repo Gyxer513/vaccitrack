@@ -176,11 +176,7 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
       .filter((e) => {
         if (statusFilter !== 'all' && e.status !== statusFilter) return false
         if (!needle) return true
-        return (
-          e.schedule.name.toLowerCase().includes(needle) ||
-          (e.schedule.key ?? '').toLowerCase().includes(needle) ||
-          (e.schedule.code ?? '').toLowerCase().includes(needle)
-        )
+        return e.schedule.name.toLowerCase().includes(needle)
       })
       .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.schedule.name.localeCompare(b.schedule.name))
   }, [enrichedSchedules, statusFilter, scheduleSearch])
@@ -448,10 +444,7 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
                         }}
                       >
                         <div className="vt-vac-item-main">
-                          <div className="vt-vac-item-title">
-                            {s.name}
-                            {s.key && <span className="vt-vac-item-key">{s.key}</span>}
-                          </div>
+                          <div className="vt-vac-item-title">{s.name}</div>
                           {d.subtitle && <div className="vt-vac-item-sub">{d.subtitle}</div>}
                         </div>
                         <div className="vt-vac-item-meta">

@@ -17,8 +17,8 @@ import {
 } from 'docx'
 import type { Form063Data, Form063Row, Form063OtherRow, TubeTestRow, VacRevSplit } from '../types'
 
-// A4 альбомная: 16838 × 11906 DXA. Поля 720 DXA (0.5"). Content-width ≈ 15398.
-const CONTENT_W = 15398
+// A4 портретная: 11906 × 16838 DXA. Поля 720 DXA (0.5"). Content-width ≈ 10466.
+const CONTENT_W = 10466
 const FONT = 'Times New Roman'
 
 const THIN = { size: 4, color: '000000', style: BorderStyle.SINGLE }
@@ -71,7 +71,7 @@ function headerRow(headers: string[], widths: number[]): TableRow {
   return new TableRow({
     tableHeader: true,
     children: headers.map((h, i) =>
-      cell(h, { width: widths[i], bold: true, align: AlignmentType.CENTER, shading: 'F2F2F2', size: 9 }),
+      cell(h, { width: widths[i], bold: true, align: AlignmentType.CENTER, shading: 'F2F2F2', size: 8 }),
     ),
   })
 }
@@ -79,7 +79,7 @@ function headerRow(headers: string[], widths: number[]): TableRow {
 function dataRow(values: string[], widths: number[], firstBold = false): TableRow {
   return new TableRow({
     children: values.map((v, i) =>
-      cell(v || '', { width: widths[i], align: AlignmentType.LEFT, size: 9, bold: i === 0 && firstBold }),
+      cell(v || '', { width: widths[i], align: AlignmentType.LEFT, size: 8, bold: i === 0 && firstBold }),
     ),
   })
 }
@@ -88,7 +88,7 @@ function emptyRow(count: number, widths: number[], label?: string): TableRow {
   const cells: TableCell[] = []
   for (let i = 0; i < count; i++) {
     cells.push(cell(i === 0 && label ? label : '', {
-      width: widths[i], size: 9, bold: i === 0 && !!label, align: AlignmentType.LEFT,
+      width: widths[i], size: 8, bold: i === 0 && !!label, align: AlignmentType.LEFT,
     }))
   }
   return new TableRow({ children: cells })
@@ -294,7 +294,7 @@ function tubeTests(rows: TubeTestRow[]): (Paragraph | Table)[] {
         rows[i + perBlock]?.date ?? '', rows[i + perBlock]?.result ?? '',
         rows[i + perBlock * 2]?.date ?? '', rows[i + perBlock * 2]?.result ?? '',
         rows[i + perBlock * 3]?.date ?? '', rows[i + perBlock * 3]?.result ?? '',
-      ].map((v, idx) => cell(v, { width: widths[idx], size: 9 })),
+      ].map((v, idx) => cell(v, { width: widths[idx], size: 8 })),
     }))
   }
   return [sectionHeading('ТУБЕРКУЛИНОВЫЕ ПРОБЫ'), table(trows)]
@@ -315,7 +315,7 @@ function polio(rows: Form063Row[]): (Paragraph | Table)[] {
       children: [
         L?.step ?? '', L?.ageLabel ?? '', L?.date ?? '', L?.series ?? '',
         R?.step ?? '', R?.ageLabel ?? '', R?.date ?? '', R?.series ?? '',
-      ].map((v, idx) => cell(v, { width: widths[idx], size: 9 })),
+      ].map((v, idx) => cell(v, { width: widths[idx], size: 8 })),
     }))
   }
   return [sectionHeading('ПРИВИВКИ ПРОТИВ ПОЛИОМИЕЛИТА'), table(trows)]
@@ -430,7 +430,7 @@ export async function generateForm063uDocx(data: Form063Data): Promise<Buffer> {
       {
         properties: {
           page: {
-            size: { orientation: PageOrientation.LANDSCAPE },
+            size: { orientation: PageOrientation.PORTRAIT },
             margin: {
               top: convertInchesToTwip(0.5),
               right: convertInchesToTwip(0.5),

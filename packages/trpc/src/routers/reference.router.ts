@@ -4,6 +4,10 @@ export const referenceRouter = router({
   vaccines: protectedProcedure.query(({ ctx }) =>
     ctx.prisma.vaccine.findMany({
       where: { organizationId: ctx.user.orgId },
+      include: {
+        // нужно для фильтрации списка под выбранную нозологию в форме записи
+        scheduleLinks: { select: { vaccineScheduleId: true } },
+      },
       orderBy: { name: 'asc' },
     }),
   ),

@@ -135,10 +135,25 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
   useEffect(() => {
     if (!exemptionTypeId && exemptionTypes?.[0]) setExemptionTypeId(exemptionTypes[0].id)
   }, [exemptionTypes, exemptionTypeId])
-  // TODO(api): reference.vaccines не фильтруется по nosology — пока показываем все.
+
+  // Фильтр препаратов по выбранной нозологии. Если связей нет вообще —
+  // fallback показывает все (чтобы не блокировать запись).
+  const filteredVaccines = useMemo(() => {
+    if (!vaccines) return []
+    if (!scheduleId) return vaccines
+    const linked = vaccines.filter((v) =>
+      (v as any).scheduleLinks?.some((l: any) => l.vaccineScheduleId === scheduleId),
+    )
+    return linked.length > 0 ? linked : vaccines
+  }, [vaccines, scheduleId])
+
+  // Если текущий vaccineId не подходит новому scheduleId — сбросить и выбрать первый из отфильтрованных
   useEffect(() => {
-    if (!vaccineId && vaccines?.[0]) setVaccineId(vaccines[0].id)
-  }, [vaccines, vaccineId])
+    if (!filteredVaccines.length) return
+    if (!vaccineId || !filteredVaccines.some((v) => v.id === vaccineId)) {
+      setVaccineId(filteredVaccines[0].id)
+    }
+  }, [filteredVaccines, vaccineId])
 
   const schedule = useMemo(
     () => schedules?.find((s) => s.id === scheduleId),
@@ -498,14 +513,14 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
                 </div>
 
                 <div className="vt-vac-cols-2-tight">
-                  <Field label="Препарат">
+                  <Field label={`Препарат${filteredVaccines.length !== vaccines?.length ? ` · подходит ${filteredVaccines.length}` : ''}`}>
                     <select
                       className="vt-select vt-vac-select-accent"
                       value={vaccineId}
                       onChange={(e) => setVaccineId(e.target.value)}
                     >
                       <option value="">— выберите —</option>
-                      {vaccines?.map((v) => (
+                      {filteredVaccines.map((v) => (
                         <option key={v.id} value={v.id}>
                           {v.name}
                           {v.producer ? ` (${v.producer})` : ''}

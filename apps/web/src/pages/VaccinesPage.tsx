@@ -480,8 +480,8 @@ function AssignmentsTable({
   onAgeChange: (id: string, key: keyof ScheduleAge, value: number) => void
   onCreated: (s: CreatedSchedule) => void
 }) {
-  const [showAll, setShowAll] = useState(false)
-  const [showNew, setShowNew] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [tab, setTab] = useState<'existing' | 'new'>('existing')
   const [q, setQ] = useState('')
 
   const linked = allSchedules.filter((s) => linkedIds.includes(s.id))
@@ -573,76 +573,86 @@ function AssignmentsTable({
 
       {/* Добавить процедуру — только в режиме редактирования */}
       {!readOnly && (
-      <div style={{ padding: '12px 22px', borderTop: '1px solid var(--vt-border)' }}>
-        {!showAll && !showNew ? (
-          <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ padding: '12px 22px', borderTop: '1px solid var(--vt-border)' }}>
+          {!open ? (
             <button
               type="button"
               className="vt-btn vt-btn-ghost vt-btn-sm"
-              onClick={() => setShowAll(true)}
+              onClick={() => setOpen(true)}
             >
               + Добавить процедуру
             </button>
-            <button
-              type="button"
-              className="vt-btn vt-btn-ghost vt-btn-sm"
-              onClick={() => setShowNew(true)}
-            >
-              + Создать новую процедуру
-            </button>
-          </div>
-        ) : showAll ? (
-          <div style={{ display: 'grid', gap: 8 }}>
-            <input
-              className="vt-input"
-              placeholder="Поиск по названию или нозологии…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              autoFocus
-            />
-            <div style={{
-              maxHeight: 200, overflowY: 'auto',
-              border: '1px solid var(--vt-border)', borderRadius: 8,
-              background: 'var(--vt-surface)',
-            }}>
-              {unlinked.length === 0 ? (
-                <div className="vt-empty" style={{ padding: 16, fontSize: 12 }}>Ничего не найдено</div>
-              ) : unlinked.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => { onToggle(s.id); setQ('') }}
-                  style={{
-                    display: 'block', width: '100%', textAlign: 'left',
-                    padding: '8px 12px', background: 'transparent',
-                    border: 'none', borderBottom: '1px solid var(--vt-border)',
-                    fontFamily: 'inherit', fontSize: 13, cursor: 'pointer',
-                    color: 'var(--vt-text)',
-                  }}
-                >
-                  <span style={{ fontWeight: 500 }}>{s.parent?.name ?? '—'}</span>
-                  <span className="vt-hint"> · {s.name}</span>
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                className="vt-btn vt-btn-ghost vt-btn-sm"
-                onClick={() => { setShowAll(false); setQ('') }}
+          ) : (
+            <div style={{ display: 'grid', gap: 12 }}>
+              {/* Табы */}
+              <div
+                style={{
+                  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, padding: 4,
+                  background: 'var(--vt-bg-warm)', borderRadius: 10,
+                }}
               >
-                Закрыть
-              </button>
+                <TabBtn active={tab === 'existing'} onClick={() => setTab('existing')}>
+                  Из списка
+                </TabBtn>
+                <TabBtn active={tab === 'new'} onClick={() => setTab('new')}>
+                  Новая процедура
+                </TabBtn>
+              </div>
+
+              {tab === 'existing' ? (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <input
+                    className="vt-input"
+                    placeholder="Поиск по названию или нозологии…"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    autoFocus
+                  />
+                  <div style={{
+                    maxHeight: 200, overflowY: 'auto',
+                    border: '1px solid var(--vt-border)', borderRadius: 8,
+                    background: 'var(--vt-surface)',
+                  }}>
+                    {unlinked.length === 0 ? (
+                      <div className="vt-empty" style={{ padding: 16, fontSize: 12 }}>Ничего не найдено</div>
+                    ) : unlinked.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => { onToggle(s.id); setQ('') }}
+                        style={{
+                          display: 'block', width: '100%', textAlign: 'left',
+                          padding: '8px 12px', background: 'transparent',
+                          border: 'none', borderBottom: '1px solid var(--vt-border)',
+                          fontFamily: 'inherit', fontSize: 13, cursor: 'pointer',
+                          color: 'var(--vt-text)',
+                        }}
+                      >
+                        <span style={{ fontWeight: 500 }}>{s.parent?.name ?? '—'}</span>
+                        <span className="vt-hint"> · {s.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <NewScheduleForm
+                  allSchedules={allSchedules}
+                  onCreated={(s) => { setOpen(false); setQ(''); onCreated(s) }}
+                />
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="vt-btn vt-btn-ghost vt-btn-sm"
+                  onClick={() => { setOpen(false); setQ('') }}
+                >
+                  Закрыть
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <NewScheduleForm
-            allSchedules={allSchedules}
-            onCancel={() => setShowNew(false)}
-            onCreated={(s) => { setShowNew(false); onCreated(s) }}
-          />
-        )}
-      </div>
+          )}
+        </div>
       )}
     </>
   )
@@ -652,11 +662,9 @@ function AssignmentsTable({
 
 function NewScheduleForm({
   allSchedules,
-  onCancel,
   onCreated,
 }: {
   allSchedules: Schedule[]
-  onCancel: () => void
   onCreated: (s: CreatedSchedule) => void
 }) {
   // Все корневые записи = нозологии (parentId = null)
@@ -718,11 +726,7 @@ function NewScheduleForm({
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--vt-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-        Новая процедура
-      </div>
-
-      {/* Переключатель нозологии */}
+      {/* Переключатель нозологии: существующая / новая */}
       <div
         style={{
           display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, padding: 4,
@@ -789,10 +793,7 @@ function NewScheduleForm({
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <button type="button" className="vt-btn vt-btn-ghost vt-btn-sm" onClick={onCancel} disabled={createSchedule.isPending}>
-          Отмена
-        </button>
+      <div>
         <button
           type="button"
           className="vt-btn vt-btn-primary vt-btn-sm"

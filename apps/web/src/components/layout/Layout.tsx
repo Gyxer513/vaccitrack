@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 const nav = [
   { to: '/patients', label: 'Пациенты' },
   { to: '/plan', label: 'План прививок' },
+  { to: '/vaccines', label: 'Вакцины' },
 ]
 
 export function Layout({ children }: { children: React.ReactNode }) {

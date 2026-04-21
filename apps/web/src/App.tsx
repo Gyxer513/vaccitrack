@@ -5,6 +5,7 @@ import { PatientDetailPage } from './pages/PatientDetailPage'
 import { NewPatientPage } from './pages/NewPatientPage'
 import { PlanPage } from './pages/PlanPage'
 import { NewVaccinationPage } from './pages/NewVaccinationPage'
+import { VaccinesPage } from './pages/VaccinesPage'
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
             <Route path="/patients/new" element={<NewPatientPage />} />
             <Route path="/patients/:id" element={<PatientDetailPage />} />
             <Route path="/plan" element={<PlanPage />} />
+            <Route path="/vaccines" element={<VaccinesPage />} />
           </Routes>
         </Layout>
       } />

@@ -39,7 +39,6 @@ export const STATUS_LABEL: Record<ScheduleStatus, string> = {
   never: 'не делали',
 }
 
-// Порядок приоритета для сортировки: что важнее показать медику сначала.
 export const STATUS_ORDER: Record<ScheduleStatus, number> = {
   overdue: 0,
   'due-soon': 1,
@@ -49,26 +48,50 @@ export const STATUS_ORDER: Record<ScheduleStatus, number> = {
   done: 5,
 }
 
-type PlanItemLike = { vaccineScheduleId: string; status: string; plannedDate: Date | string }
+type ScheduleAgeInfo = {
+  id: string
+  minAgeYears: number
+  minAgeMonths: number
+  minAgeDays: number
+  maxAgeYears: number
+  maxAgeMonths: number
+  maxAgeDays: number
+}
+
 type RecordLike = { vaccineScheduleId: string | null; vaccinationDate: Date | string }
 
+// Грубая конвертация возраста в дни. Для задачи «пора ли» точности хватает.
+function ageToDays(years: number, months: number, days: number): number {
+  return Math.round(years * 365.25) + Math.round(months * 30.5) + days
+}
+
+function daysBetween(from: Date | string, to: Date | string): number {
+  return Math.floor(
+    (new Date(to).getTime() - new Date(from).getTime()) / (1000 * 60 * 60 * 24),
+  )
+}
+
+// Окно «скоро»: за сколько дней ДО минимального возраста считать прививку как due-soon.
+const DUE_SOON_WINDOW_DAYS = 30
+
 export function getScheduleStatus(
-  scheduleId: string,
-  planItems: PlanItemLike[] | undefined,
+  schedule: ScheduleAgeInfo,
+  birthday: Date | string,
   records: RecordLike[] | undefined,
 ): ScheduleStatus {
-  const plan = planItems?.find((p) => p.vaccineScheduleId === scheduleId)
-  if (plan) {
-    if (plan.status === 'OVERDUE') return 'overdue'
-    if (plan.status === 'PLANNED') {
-      const days = (new Date(plan.plannedDate).getTime() - Date.now()) / 86_400_000
-      return days <= 30 ? 'due-soon' : 'planned'
-    }
-    if (plan.status === 'EXEMPTED') return 'exempt'
-    if (plan.status === 'DONE') return 'done'
-  }
-  const hasRecord = records?.some((r) => r.vaccineScheduleId === scheduleId)
-  return hasRecord ? 'done' : 'never'
+  // 1. Уже сделана?
+  if (records?.some((r) => r.vaccineScheduleId === schedule.id)) return 'done'
+
+  const ageDays = daysBetween(birthday, new Date())
+  const minDays = ageToDays(schedule.minAgeYears, schedule.minAgeMonths, schedule.minAgeDays)
+  const maxDays = schedule.maxAgeYears >= 99
+    ? Number.POSITIVE_INFINITY
+    : ageToDays(schedule.maxAgeYears, schedule.maxAgeMonths, schedule.maxAgeDays)
+
+  if (ageDays > maxDays) return 'never'       // окно пропущено
+  if (ageDays >= minDays) return 'overdue'    // пора, но не сделано
+  if (minDays - ageDays <= DUE_SOON_WINDOW_DAYS) return 'due-soon'
+  return 'planned'
 }
 
 export function getLastDose(

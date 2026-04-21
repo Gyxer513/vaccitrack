@@ -165,7 +165,7 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
   const enrichedSchedules = useMemo(() => {
     if (!schedules || !patient) return []
     return schedules.map((s) => {
-      const status = getScheduleStatus(s.id, patient.planItems, patient.vaccinationRecords)
+      const status = getScheduleStatus(s, patient.birthday, patient.vaccinationRecords)
       const last = getLastDose(s.id, patient.vaccinationRecords)
       const disp = getScheduleDisplay(s)
       return { schedule: s, status, lastDose: last, display: disp }

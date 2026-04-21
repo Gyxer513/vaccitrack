@@ -1,4 +1,5 @@
 export { generateForm063u } from './templates/form063u'
+export { generateForm063uDocx } from './templates/form063u-docx'
 export { generateCertificate } from './templates/certificate'
 export type {
   Form063Data,

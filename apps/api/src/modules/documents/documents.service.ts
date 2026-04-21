@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { prisma } from '@vaccitrack/db'
-import { generateForm063u, generateCertificate } from '@vaccitrack/pdf'
+import { generateForm063u, generateForm063uDocx, generateCertificate } from '@vaccitrack/pdf'
+import type { Form063Data } from '@vaccitrack/pdf'
 import type { Form063Row, Form063OtherRow, VacRevSplit } from '@vaccitrack/pdf'
 
 type RecordWithRefs = Awaited<ReturnType<typeof loadRecords>>[number]
@@ -111,7 +112,7 @@ function splitByVacRev(rs: RecordWithRefs[]): VacRevSplit {
 
 @Injectable()
 export class DocumentsService {
-  async form063u(patientId: string, orgId: string): Promise<Buffer> {
+  private async buildForm063uData(patientId: string, orgId: string): Promise<Form063Data> {
     const patient = await prisma.patient.findFirst({ where: { id: patientId, organizationId: orgId } })
     if (!patient) throw new NotFoundException('Пациент не найден')
     const org = await prisma.organization.findUniqueOrThrow({ where: { id: orgId } })
@@ -122,7 +123,7 @@ export class DocumentsService {
     }
     for (const r of records) buckets[sectionOf(r)].push(r)
 
-    return generateForm063u({
+    return {
       okud: org.okud ?? '',
       okpo: org.okpo ?? '',
       lpuName: org.name,
@@ -143,7 +144,15 @@ export class DocumentsService {
       rubella: dedupRows(buckets.rubella),
       hepatitisB: dedupRows(buckets.hepatitisB),
       other: dedupOther(buckets.other),
-    })
+    }
+  }
+
+  async form063u(patientId: string, orgId: string): Promise<Buffer> {
+    return generateForm063u(await this.buildForm063uData(patientId, orgId))
+  }
+
+  async form063uDocx(patientId: string, orgId: string): Promise<Buffer> {
+    return generateForm063uDocx(await this.buildForm063uData(patientId, orgId))
   }
 
   async certificate(patientId: string, orgId: string): Promise<Buffer> {

@@ -3,8 +3,9 @@
   "version": "0.0.1",
   "main": "./src/index.ts",
   "dependencies": {
-    "pdfkit": "^0.15.0",
-    "@vaccitrack/db": "workspace:*"
+    "@vaccitrack/db": "workspace:*",
+    "docx": "^9.6.1",
+    "pdfkit": "^0.15.0"
   },
   "devDependencies": {
     "@types/pdfkit": "^0.13.0"

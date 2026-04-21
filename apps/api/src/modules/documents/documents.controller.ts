@@ -32,11 +32,20 @@ export class DocumentsController {
   constructor(@Inject(DocumentsService) private readonly svc: DocumentsService) {}
 
   @Get('patients/:id/form063u')
-  @ApiOperation({ summary: 'Скачать форму 063/у' })
+  @ApiOperation({ summary: 'Скачать форму 063/у (PDF)' })
   async form063u(@Param('id') id: string, @Req() req: Request, @Res() res: Response) {
     const buffer = await this.svc.form063u(id, resolveOrgId(req))
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Disposition', `inline; filename="063u_${id}.pdf"`)
+    res.send(buffer)
+  }
+
+  @Get('patients/:id/form063u.docx')
+  @ApiOperation({ summary: 'Скачать форму 063/у (Word)' })
+  async form063uDocx(@Param('id') id: string, @Req() req: Request, @Res() res: Response) {
+    const buffer = await this.svc.form063uDocx(id, resolveOrgId(req))
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    res.setHeader('Content-Disposition', `attachment; filename="063u_${id}.docx"`)
     res.send(buffer)
   }
 

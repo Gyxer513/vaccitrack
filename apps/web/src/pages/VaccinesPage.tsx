@@ -58,6 +58,7 @@ export function VaccinesPage() {
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
+  const [isDraft, setIsDraft] = useState(false)
 
   // Локальное состояние формы редактируемой вакцины
   const [fields, setFields] = useState<VaccineFields>({ name: '', producer: '', country: '', dosesMl: '' })
@@ -103,10 +104,10 @@ export function VaccinesPage() {
     setEditMode(false)
   }, [selected?.id])
 
-  // При выборе первой в списке, если ничего не выбрано
+  // При выборе первой в списке, если ничего не выбрано (и не создаём черновик)
   useEffect(() => {
-    if (!selectedId && filteredVaccines[0]) setSelectedId(filteredVaccines[0].id)
-  }, [filteredVaccines, selectedId])
+    if (!selectedId && !isDraft && filteredVaccines[0]) setSelectedId(filteredVaccines[0].id)
+  }, [filteredVaccines, selectedId, isDraft])
 
   const updateVaccine = trpc.vaccine.update.useMutation()
   const createVaccine = trpc.vaccine.create.useMutation()
@@ -151,25 +152,32 @@ export function VaccinesPage() {
   }
 
   const handleSave = async () => {
-    if (!selected) return
     setError(null)
     try {
-      // 1. Обновляем поля вакцины
-      await updateVaccine.mutateAsync({
-        id: selected.id,
-        data: {
-          name: fields.name.trim(),
-          producer: fields.producer.trim() || null,
-          country: fields.country.trim() || null,
-          dosesMl: fields.dosesMl.trim() ? Number(fields.dosesMl) : null,
-        },
-      })
-      // 2. Перезаписываем связи
+      const payload = {
+        name: fields.name.trim(),
+        producer: fields.producer.trim() || null,
+        country: fields.country.trim() || null,
+        dosesMl: fields.dosesMl.trim() ? Number(fields.dosesMl) : null,
+      }
+
+      let vaccineId: string
+      if (isDraft) {
+        // Draft — первый Save создаёт запись в БД.
+        const created = await createVaccine.mutateAsync(payload)
+        vaccineId = created.id
+      } else {
+        if (!selected) return
+        await updateVaccine.mutateAsync({ id: selected.id, data: payload })
+        vaccineId = selected.id
+      }
+
+      // Связи
       await setSchedules.mutateAsync({
-        vaccineId: selected.id,
+        vaccineId,
         scheduleIds: linkedIds,
       })
-      // 3. Обновляем возрастные поля всех связанных schedule
+      // Возрастные поля связанных schedule
       for (const sid of linkedIds) {
         const age = scheduleAges[sid]
         if (age) {
@@ -180,6 +188,10 @@ export function VaccinesPage() {
       await utils.schedule.list.invalidate()
       setDirty(false)
       setEditMode(false)
+      if (isDraft) {
+        setIsDraft(false)
+        setSelectedId(vaccineId)
+      }
     } catch (e: any) {
       setError(e.message ?? 'Ошибка сохранения')
     }
@@ -187,8 +199,15 @@ export function VaccinesPage() {
 
   const handleCancelEdit = () => {
     if (dirty && !confirm('Отбросить несохранённые изменения?')) return
-    // Восстановить поля из selected
-    if (selected) {
+    if (isDraft) {
+      // Черновик не был в БД — просто выбросим его.
+      setIsDraft(false)
+      setSelectedId(null)
+      setFields({ name: '', producer: '', country: '', dosesMl: '' })
+      setLinkedIds([])
+      setScheduleAges({})
+    } else if (selected) {
+      // Восстановить поля из selected
       setFields({
         name: selected.name,
         producer: selected.producer ?? '',
@@ -211,16 +230,16 @@ export function VaccinesPage() {
     setError(null)
   }
 
-  const handleCreate = async () => {
+  const handleCreate = () => {
+    // Создаём черновик локально. В БД запись попадёт только после «Сохранить».
     setError(null)
-    try {
-      const created = await createVaccine.mutateAsync({ name: 'Новая вакцина' })
-      await utils.vaccine.list.invalidate()
-      setSelectedId(created.id)
-      setEditMode(true) // сразу в режим редактирования
-    } catch (e: any) {
-      setError(e.message ?? 'Ошибка создания')
-    }
+    setSelectedId(null)
+    setIsDraft(true)
+    setFields({ name: '', producer: '', country: '', dosesMl: '' })
+    setLinkedIds([])
+    setScheduleAges({})
+    setDirty(true)      // чтобы «Сохранить» был активен
+    setEditMode(true)
   }
 
   const handleDelete = async () => {
@@ -275,6 +294,7 @@ export function VaccinesPage() {
               type="button"
               onClick={() => {
                 if (dirty && !confirm('Есть несохранённые изменения. Отбросить?')) return
+                setIsDraft(false)
                 setSelectedId(v.id)
               }}
               style={{
@@ -301,15 +321,17 @@ export function VaccinesPage() {
 
       {/* ПРАВАЯ КОЛОНКА — ДЕТАЛИ */}
       <main style={{ display: 'grid', gap: 18 }}>
-        {!selected ? (
+        {!selected && !isDraft ? (
           <div className="vt-empty">Выбери вакцину слева или создай новую.</div>
         ) : (
           <>
             {/* Характеристика */}
             <div className="vt-card" style={{ padding: 22, display: 'grid', gap: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div className="vt-section-title">Характеристика</div>
-                {!editMode && (
+                <div className="vt-section-title">
+                  {isDraft ? 'Новая вакцина' : 'Характеристика'}
+                </div>
+                {!editMode && !isDraft && (
                   <button
                     type="button"
                     className="vt-btn vt-btn-ghost vt-btn-sm"
@@ -368,13 +390,25 @@ export function VaccinesPage() {
                     display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center',
                   }}
                 >
-                  {uniqueDiseases(selected).length === 0 ? (
-                    <span className="vt-hint">нет связанных процедур</span>
-                  ) : (
-                    uniqueDiseases(selected).map((d) => (
-                      <span key={d} className="vt-badge vt-badge-accent">{d}</span>
-                    ))
-                  )}
+                  {(() => {
+                    // В draft-режиме нозологии берём из текущих linkedIds+schedules,
+                    // а не из selected (его ещё нет).
+                    const currentSchedules = schedulesQ.data ?? []
+                    const diseases = isDraft
+                      ? Array.from(new Set(
+                          currentSchedules
+                            .filter((s) => linkedIds.includes(s.id))
+                            .map((s) => s.parent?.name ?? s.name),
+                        ))
+                      : uniqueDiseases(selected)
+                    return diseases.length === 0 ? (
+                      <span className="vt-hint">нет связанных процедур</span>
+                    ) : (
+                      diseases.map((d) => (
+                        <span key={d} className="vt-badge vt-badge-accent">{d}</span>
+                      ))
+                    )
+                  })()}
                 </div>
               </LabeledField>
             </div>
@@ -424,14 +458,18 @@ export function VaccinesPage() {
 
             {editMode && (
               <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between' }}>
-                <button
-                  className="vt-btn vt-btn-ghost"
-                  onClick={handleDelete}
-                  disabled={busy}
-                  style={{ color: 'var(--vt-danger-text)', borderColor: 'var(--vt-danger-border)' }}
-                >
-                  Удалить вакцину
-                </button>
+                {isDraft ? (
+                  <span />
+                ) : (
+                  <button
+                    className="vt-btn vt-btn-ghost"
+                    onClick={handleDelete}
+                    disabled={busy}
+                    style={{ color: 'var(--vt-danger-text)', borderColor: 'var(--vt-danger-border)' }}
+                  >
+                    Удалить вакцину
+                  </button>
+                )}
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button
                     className="vt-btn vt-btn-ghost"
@@ -445,7 +483,7 @@ export function VaccinesPage() {
                     onClick={handleSave}
                     disabled={!dirty || busy || !fields.name.trim()}
                   >
-                    {busy ? 'Сохраняем…' : 'Сохранить'}
+                    {busy ? 'Сохраняем…' : isDraft ? 'Создать вакцину' : 'Сохранить'}
                   </button>
                 </div>
               </div>

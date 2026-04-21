@@ -265,9 +265,11 @@ model VaccinationRecord {
 
   vaccinationDate DateTime @db.Date
   doseNumber      Float?
+  doseVolumeMl    Float?
   series          String?
   checkNumber     String?
   result          String?
+  note            String?
 
   medExemptionTypeId String?
   medExemptionType   MedExemptionType? @relation(fields: [medExemptionTypeId], references: [id])

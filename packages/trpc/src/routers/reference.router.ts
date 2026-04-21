@@ -11,6 +11,7 @@ export const referenceRouter = router({
   schedules: protectedProcedure.query(({ ctx }) =>
     ctx.prisma.vaccineSchedule.findMany({
       where: { isActive: true },
+      include: { parent: true },
       orderBy: { code: 'asc' },
     }),
   ),
@@ -32,5 +33,13 @@ export const referenceRouter = router({
       where: { site: { organizationId: ctx.user.orgId } },
       orderBy: [{ lastName: 'asc' }],
     }),
+  ),
+
+  insurances: protectedProcedure.query(({ ctx }) =>
+    ctx.prisma.insuranceCompany.findMany({ orderBy: { name: 'asc' } }),
+  ),
+
+  riskGroups: protectedProcedure.query(({ ctx }) =>
+    ctx.prisma.riskGroup.findMany({ orderBy: { name: 'asc' } }),
   ),
 })

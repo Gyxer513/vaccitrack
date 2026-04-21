@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Res, Req } from '@nestjs/common'
+import { Controller, Get, Inject, Param, Res, Req } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger'
 import { DocumentsService } from './documents.service'
 import type { Request, Response } from 'express'
@@ -26,7 +26,10 @@ function resolveOrgId(req: Request): string {
 @ApiBearerAuth()
 @Controller('documents')
 export class DocumentsController {
-  constructor(private readonly svc: DocumentsService) {}
+  // tsx/esbuild не эмитит emitDecoratorMetadata → Nest не может
+  // резолвить тип конструктора по рефлексии. @Inject с явным токеном
+  // работает без метадаты.
+  constructor(@Inject(DocumentsService) private readonly svc: DocumentsService) {}
 
   @Get('patients/:id/form063u')
   @ApiOperation({ summary: 'Скачать форму 063/у' })

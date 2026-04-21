@@ -14,6 +14,13 @@ const scheduleAgeFields = z.object({
   intervalDays: z.number().int().min(0).optional(),
 })
 
+const scheduleCreateInput = z.object({
+  name: z.string().min(1),
+  shortName: z.string().optional(),
+  parentId: z.string().optional().nullable(),
+  isEpid: z.boolean().optional(),
+}).merge(scheduleAgeFields)
+
 export const scheduleRouter = router({
   list: protectedProcedure.query(({ ctx }) =>
     ctx.prisma.vaccineSchedule.findMany({
@@ -29,6 +36,19 @@ export const scheduleRouter = router({
       ctx.prisma.vaccineSchedule.update({
         where: { id: input.id },
         data: input.data,
+      }),
+    ),
+
+  create: protectedProcedure
+    .input(scheduleCreateInput)
+    .mutation(({ ctx, input }) =>
+      ctx.prisma.vaccineSchedule.create({
+        data: {
+          ...input,
+          // code — служебное поле из FoxPro. Для новых генерим простой uid-подобный ключ.
+          code: `user_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          isActive: true,
+        },
       }),
     ),
 })

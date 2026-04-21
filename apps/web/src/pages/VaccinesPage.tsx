@@ -57,6 +57,7 @@ export function VaccinesPage() {
 
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [editMode, setEditMode] = useState(false)
 
   // Локальное состояние формы редактируемой вакцины
   const [fields, setFields] = useState<VaccineFields>({ name: '', producer: '', country: '', dosesMl: '' })
@@ -99,6 +100,7 @@ export function VaccinesPage() {
     setScheduleAges(ages)
     setDirty(false)
     setError(null)
+    setEditMode(false)
   }, [selected?.id])
 
   // При выборе первой в списке, если ничего не выбрано
@@ -177,9 +179,36 @@ export function VaccinesPage() {
       await utils.vaccine.list.invalidate()
       await utils.schedule.list.invalidate()
       setDirty(false)
+      setEditMode(false)
     } catch (e: any) {
       setError(e.message ?? 'Ошибка сохранения')
     }
+  }
+
+  const handleCancelEdit = () => {
+    if (dirty && !confirm('Отбросить несохранённые изменения?')) return
+    // Восстановить поля из selected
+    if (selected) {
+      setFields({
+        name: selected.name,
+        producer: selected.producer ?? '',
+        country: selected.country ?? '',
+        dosesMl: selected.dosesMl != null ? String(selected.dosesMl) : '',
+      })
+      setLinkedIds(selected.scheduleLinks.map((l) => l.vaccineScheduleId))
+      const ages: Record<string, ScheduleAge> = {}
+      for (const l of selected.scheduleLinks) {
+        const s = l.vaccineSchedule
+        ages[s.id] = {
+          minAgeYears: s.minAgeYears, minAgeMonths: s.minAgeMonths, minAgeDays: s.minAgeDays,
+          maxAgeYears: s.maxAgeYears, maxAgeMonths: s.maxAgeMonths, maxAgeDays: s.maxAgeDays,
+        }
+      }
+      setScheduleAges(ages)
+    }
+    setDirty(false)
+    setEditMode(false)
+    setError(null)
   }
 
   const handleCreate = async () => {
@@ -188,6 +217,7 @@ export function VaccinesPage() {
       const created = await createVaccine.mutateAsync({ name: 'Новая вакцина' })
       await utils.vaccine.list.invalidate()
       setSelectedId(created.id)
+      setEditMode(true) // сразу в режим редактирования
     } catch (e: any) {
       setError(e.message ?? 'Ошибка создания')
     }
@@ -276,7 +306,19 @@ export function VaccinesPage() {
           <>
             {/* Характеристика */}
             <div className="vt-card" style={{ padding: 22, display: 'grid', gap: 14 }}>
-              <div className="vt-section-title">Характеристика</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div className="vt-section-title">Характеристика</div>
+                {!editMode && (
+                  <button
+                    type="button"
+                    className="vt-btn vt-btn-ghost vt-btn-sm"
+                    onClick={() => setEditMode(true)}
+                    title="Включить редактирование"
+                  >
+                    ✎ Редактировать
+                  </button>
+                )}
+              </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <LabeledField label="Наименование" required>
@@ -284,6 +326,7 @@ export function VaccinesPage() {
                     className="vt-input"
                     value={fields.name}
                     onChange={(e) => setField('name', e.target.value)}
+                    readOnly={!editMode}
                   />
                 </LabeledField>
                 <LabeledField label="Доза, мл">
@@ -292,6 +335,7 @@ export function VaccinesPage() {
                     value={fields.dosesMl}
                     onChange={(e) => setField('dosesMl', e.target.value)}
                     placeholder="0.5"
+                    readOnly={!editMode}
                   />
                 </LabeledField>
               </div>
@@ -302,6 +346,7 @@ export function VaccinesPage() {
                     className="vt-input"
                     value={fields.producer}
                     onChange={(e) => setField('producer', e.target.value)}
+                    readOnly={!editMode}
                   />
                 </LabeledField>
                 <LabeledField label="Страна">
@@ -309,6 +354,7 @@ export function VaccinesPage() {
                     className="vt-input"
                     value={fields.country}
                     onChange={(e) => setField('country', e.target.value)}
+                    readOnly={!editMode}
                   />
                 </LabeledField>
               </div>
@@ -351,8 +397,21 @@ export function VaccinesPage() {
                 allSchedules={schedulesQ.data ?? []}
                 linkedIds={linkedIds}
                 ages={scheduleAges}
+                readOnly={!editMode}
                 onToggle={toggleLink}
                 onAgeChange={setAge}
+                onCreated={(s) => {
+                  // Добавляем созданную процедуру как связанную + подтянем её возраст
+                  setScheduleAges((p) => ({
+                    ...p,
+                    [s.id]: {
+                      minAgeYears: s.minAgeYears, minAgeMonths: s.minAgeMonths, minAgeDays: s.minAgeDays,
+                      maxAgeYears: s.maxAgeYears, maxAgeMonths: s.maxAgeMonths, maxAgeDays: s.maxAgeDays,
+                    },
+                  }))
+                  setLinkedIds((p) => [...p, s.id])
+                  setDirty(true)
+                }}
               />
             </div>
 
@@ -362,23 +421,34 @@ export function VaccinesPage() {
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between' }}>
-              <button
-                className="vt-btn vt-btn-ghost"
-                onClick={handleDelete}
-                disabled={busy}
-                style={{ color: 'var(--vt-danger-text)', borderColor: 'var(--vt-danger-border)' }}
-              >
-                Удалить вакцину
-              </button>
-              <button
-                className="vt-btn vt-btn-primary"
-                onClick={handleSave}
-                disabled={!dirty || busy || !fields.name.trim()}
-              >
-                {busy ? 'Сохраняем…' : dirty ? 'Сохранить' : 'Сохранено'}
-              </button>
-            </div>
+            {editMode && (
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between' }}>
+                <button
+                  className="vt-btn vt-btn-ghost"
+                  onClick={handleDelete}
+                  disabled={busy}
+                  style={{ color: 'var(--vt-danger-text)', borderColor: 'var(--vt-danger-border)' }}
+                >
+                  Удалить вакцину
+                </button>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    className="vt-btn vt-btn-ghost"
+                    onClick={handleCancelEdit}
+                    disabled={busy}
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    className="vt-btn vt-btn-primary"
+                    onClick={handleSave}
+                    disabled={!dirty || busy || !fields.name.trim()}
+                  >
+                    {busy ? 'Сохраняем…' : 'Сохранить'}
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </main>
@@ -388,22 +458,29 @@ export function VaccinesPage() {
 
 /* ————— Таблица назначений ————— */
 
-type Schedule = { id: string; name: string; code: string; parent: { name: string } | null }
+type Schedule = { id: string; name: string; code: string; parent: { id: string; name: string } | null }
+
+type CreatedSchedule = Schedule & ScheduleAge
 
 function AssignmentsTable({
   allSchedules,
   linkedIds,
   ages,
+  readOnly,
   onToggle,
   onAgeChange,
+  onCreated,
 }: {
   allSchedules: Schedule[]
   linkedIds: string[]
   ages: Record<string, ScheduleAge>
+  readOnly: boolean
   onToggle: (id: string) => void
   onAgeChange: (id: string, key: keyof ScheduleAge, value: number) => void
+  onCreated: (s: CreatedSchedule) => void
 }) {
   const [showAll, setShowAll] = useState(false)
+  const [showNew, setShowNew] = useState(false)
   const [q, setQ] = useState('')
 
   const linked = allSchedules.filter((s) => linkedIds.includes(s.id))
@@ -465,22 +542,24 @@ function AssignmentsTable({
                 <tr key={s.id}>
                   <td className="vt-muted">{s.parent?.name ?? '—'}</td>
                   <td>{s.name}</td>
-                  <AgeCell value={a.minAgeYears} onChange={(v) => onAgeChange(s.id, 'minAgeYears', v)} />
-                  <AgeCell value={a.minAgeMonths} max={11} onChange={(v) => onAgeChange(s.id, 'minAgeMonths', v)} />
-                  <AgeCell value={a.minAgeDays} max={31} onChange={(v) => onAgeChange(s.id, 'minAgeDays', v)} />
-                  <AgeCell value={a.maxAgeYears} onChange={(v) => onAgeChange(s.id, 'maxAgeYears', v)} borderLeft />
-                  <AgeCell value={a.maxAgeMonths} max={11} onChange={(v) => onAgeChange(s.id, 'maxAgeMonths', v)} />
-                  <AgeCell value={a.maxAgeDays} max={31} onChange={(v) => onAgeChange(s.id, 'maxAgeDays', v)} />
+                  <AgeCell value={a.minAgeYears} onChange={(v) => onAgeChange(s.id, 'minAgeYears', v)} readOnly={readOnly} />
+                  <AgeCell value={a.minAgeMonths} max={11} onChange={(v) => onAgeChange(s.id, 'minAgeMonths', v)} readOnly={readOnly} />
+                  <AgeCell value={a.minAgeDays} max={31} onChange={(v) => onAgeChange(s.id, 'minAgeDays', v)} readOnly={readOnly} />
+                  <AgeCell value={a.maxAgeYears} onChange={(v) => onAgeChange(s.id, 'maxAgeYears', v)} borderLeft readOnly={readOnly} />
+                  <AgeCell value={a.maxAgeMonths} max={11} onChange={(v) => onAgeChange(s.id, 'maxAgeMonths', v)} readOnly={readOnly} />
+                  <AgeCell value={a.maxAgeDays} max={31} onChange={(v) => onAgeChange(s.id, 'maxAgeDays', v)} readOnly={readOnly} />
                   <td style={{ textAlign: 'center' }}>
-                    <button
-                      type="button"
-                      className="vt-btn vt-btn-icon"
-                      onClick={() => onToggle(s.id)}
-                      title="Удалить из назначения"
-                      style={{ color: 'var(--vt-danger-text)' }}
-                    >
-                      ×
-                    </button>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        className="vt-btn vt-btn-icon"
+                        onClick={() => onToggle(s.id)}
+                        title="Удалить из назначения"
+                        style={{ color: 'var(--vt-danger-text)' }}
+                      >
+                        ×
+                      </button>
+                    )}
                   </td>
                 </tr>
               )
@@ -489,17 +568,27 @@ function AssignmentsTable({
         </table>
       )}
 
-      {/* Добавить процедуру */}
+      {/* Добавить процедуру — только в режиме редактирования */}
+      {!readOnly && (
       <div style={{ padding: '12px 22px', borderTop: '1px solid var(--vt-border)' }}>
-        {!showAll ? (
-          <button
-            type="button"
-            className="vt-btn vt-btn-ghost vt-btn-sm"
-            onClick={() => setShowAll(true)}
-          >
-            + Добавить процедуру
-          </button>
-        ) : (
+        {!showAll && !showNew ? (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              className="vt-btn vt-btn-ghost vt-btn-sm"
+              onClick={() => setShowAll(true)}
+            >
+              + Добавить процедуру
+            </button>
+            <button
+              type="button"
+              className="vt-btn vt-btn-ghost vt-btn-sm"
+              onClick={() => setShowNew(true)}
+            >
+              + Создать новую процедуру
+            </button>
+          </div>
+        ) : showAll ? (
           <div style={{ display: 'grid', gap: 8 }}>
             <input
               className="vt-input"
@@ -543,9 +632,211 @@ function AssignmentsTable({
               </button>
             </div>
           </div>
+        ) : (
+          <NewScheduleForm
+            allSchedules={allSchedules}
+            onCancel={() => setShowNew(false)}
+            onCreated={(s) => { setShowNew(false); onCreated(s) }}
+          />
         )}
       </div>
+      )}
     </>
+  )
+}
+
+/* ————— Форма создания новой процедуры ————— */
+
+function NewScheduleForm({
+  allSchedules,
+  onCancel,
+  onCreated,
+}: {
+  allSchedules: Schedule[]
+  onCancel: () => void
+  onCreated: (s: CreatedSchedule) => void
+}) {
+  // Все корневые записи = нозологии (parentId = null)
+  const roots = useMemo(
+    () => allSchedules.filter((s) => !s.parent).sort((a, b) => a.name.localeCompare(b.name)),
+    [allSchedules],
+  )
+
+  const [mode, setMode] = useState<'existing' | 'new'>('existing')
+  const [parentId, setParentId] = useState<string>(roots[0]?.id ?? '')
+  const [newDiseaseName, setNewDiseaseName] = useState('')
+  const [name, setName] = useState('')
+  const [minY, setMinY] = useState(0)
+  const [minM, setMinM] = useState(0)
+  const [minD, setMinD] = useState(0)
+  const [maxY, setMaxY] = useState(99)
+  const [maxM, setMaxM] = useState(0)
+  const [maxD, setMaxD] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+
+  const createSchedule = trpc.schedule.create.useMutation()
+  const utils = trpc.useUtils()
+
+  const canCreate = !!name.trim() &&
+    (mode === 'existing' ? !!parentId : !!newDiseaseName.trim())
+
+  const handleCreate = async () => {
+    setError(null)
+    try {
+      let finalParentId = mode === 'existing' ? parentId : null
+      // Если создаём новую нозологию — сначала root-запись
+      if (mode === 'new') {
+        const rootCreated = await createSchedule.mutateAsync({
+          name: newDiseaseName.trim(),
+          parentId: null,
+        })
+        finalParentId = rootCreated.id
+      }
+      // Теперь создаём саму процедуру-этап
+      const created = await createSchedule.mutateAsync({
+        name: name.trim(),
+        parentId: finalParentId,
+        minAgeYears: minY, minAgeMonths: minM, minAgeDays: minD,
+        maxAgeYears: maxY, maxAgeMonths: maxM, maxAgeDays: maxD,
+      })
+      await utils.schedule.list.invalidate()
+      onCreated({
+        id: created.id,
+        name: created.name,
+        code: created.code,
+        parent: finalParentId ? { id: finalParentId, name: mode === 'new' ? newDiseaseName.trim() : roots.find((r) => r.id === finalParentId)?.name ?? '' } : null,
+        minAgeYears: minY, minAgeMonths: minM, minAgeDays: minD,
+        maxAgeYears: maxY, maxAgeMonths: maxM, maxAgeDays: maxD,
+      })
+    } catch (e: any) {
+      setError(e.message ?? 'Не удалось создать')
+    }
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--vt-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        Новая процедура
+      </div>
+
+      {/* Переключатель нозологии */}
+      <div
+        style={{
+          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, padding: 4,
+          background: 'var(--vt-bg-warm)', borderRadius: 10,
+        }}
+      >
+        <TabBtn active={mode === 'existing'} onClick={() => setMode('existing')}>Выбрать нозологию</TabBtn>
+        <TabBtn active={mode === 'new'} onClick={() => setMode('new')}>Новая нозология</TabBtn>
+      </div>
+
+      {mode === 'existing' ? (
+        <LabeledField label="Нозология">
+          <select
+            className="vt-select"
+            value={parentId}
+            onChange={(e) => setParentId(e.target.value)}
+          >
+            {roots.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </select>
+        </LabeledField>
+      ) : (
+        <LabeledField label="Название нозологии">
+          <input
+            className="vt-input"
+            value={newDiseaseName}
+            onChange={(e) => setNewDiseaseName(e.target.value)}
+            placeholder="например, Менингококковая инфекция"
+            autoFocus
+          />
+        </LabeledField>
+      )}
+
+      <LabeledField label="Название этапа" required>
+        <input
+          className="vt-input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Первая вакцинация / Ревакцинация / …"
+        />
+      </LabeledField>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <LabeledField label="Минимальный возраст (Год / Мес / Дн)">
+          <div style={{ display: 'flex', gap: 6 }}>
+            <TinyNumber value={minY} onChange={setMinY} />
+            <TinyNumber value={minM} max={11} onChange={setMinM} />
+            <TinyNumber value={minD} max={31} onChange={setMinD} />
+          </div>
+        </LabeledField>
+        <LabeledField label="Максимальный возраст (Год / Мес / Дн)">
+          <div style={{ display: 'flex', gap: 6 }}>
+            <TinyNumber value={maxY} onChange={setMaxY} />
+            <TinyNumber value={maxM} max={11} onChange={setMaxM} />
+            <TinyNumber value={maxD} max={31} onChange={setMaxD} />
+          </div>
+        </LabeledField>
+      </div>
+
+      {error && (
+        <div className="vt-badge vt-badge-warn" style={{ padding: '8px 12px', fontSize: 12, borderRadius: 8 }}>
+          {error}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <button type="button" className="vt-btn vt-btn-ghost vt-btn-sm" onClick={onCancel} disabled={createSchedule.isPending}>
+          Отмена
+        </button>
+        <button
+          type="button"
+          className="vt-btn vt-btn-primary vt-btn-sm"
+          onClick={handleCreate}
+          disabled={!canCreate || createSchedule.isPending}
+        >
+          {createSchedule.isPending ? 'Создаём…' : 'Создать и связать'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: '8px 12px', fontFamily: 'inherit', fontSize: 12, fontWeight: 500,
+        border: 'none', borderRadius: 7, cursor: 'pointer',
+        background: active ? 'var(--vt-surface)' : 'transparent',
+        color: active ? 'var(--vt-primary-hover)' : 'var(--vt-muted)',
+        boxShadow: active ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function TinyNumber({ value, max, onChange }: { value: number; max?: number; onChange: (n: number) => void }) {
+  return (
+    <input
+      type="number"
+      min={0}
+      max={max}
+      value={value}
+      onChange={(e) => onChange(Math.max(0, Math.min(max ?? 99, Number(e.target.value) || 0)))}
+      style={{
+        width: 54, padding: '6px 8px', fontSize: 12,
+        fontFamily: 'var(--vt-font-mono)',
+        border: '1px solid var(--vt-input-border)',
+        borderRadius: 6, background: 'var(--vt-surface)', color: 'var(--vt-text)',
+        textAlign: 'center',
+      }}
+    />
   )
 }
 
@@ -577,8 +868,8 @@ function SubTh({ children, borderLeft }: { children: React.ReactNode; borderLeft
 }
 
 function AgeCell({
-  value, onChange, max, borderLeft,
-}: { value: number; onChange: (n: number) => void; max?: number; borderLeft?: boolean }) {
+  value, onChange, max, borderLeft, readOnly,
+}: { value: number; onChange: (n: number) => void; max?: number; borderLeft?: boolean; readOnly?: boolean }) {
   return (
     <td
       style={{
@@ -587,20 +878,24 @@ function AgeCell({
         textAlign: 'center',
       }}
     >
-      <input
-        type="number"
-        min={0}
-        max={max}
-        value={value}
-        onChange={(e) => onChange(Math.max(0, Math.min(max ?? 99, Number(e.target.value) || 0)))}
-        style={{
-          width: 48, padding: '4px 6px', fontSize: 12,
-          fontFamily: 'var(--vt-font-mono)',
-          border: '1px solid var(--vt-input-border)',
-          borderRadius: 6, background: 'var(--vt-surface)', color: 'var(--vt-text)',
-          textAlign: 'center',
-        }}
-      />
+      {readOnly ? (
+        <span className="vt-mono" style={{ fontSize: 12 }}>{value}</span>
+      ) : (
+        <input
+          type="number"
+          min={0}
+          max={max}
+          value={value}
+          onChange={(e) => onChange(Math.max(0, Math.min(max ?? 99, Number(e.target.value) || 0)))}
+          style={{
+            width: 48, padding: '4px 6px', fontSize: 12,
+            fontFamily: 'var(--vt-font-mono)',
+            border: '1px solid var(--vt-input-border)',
+            borderRadius: 6, background: 'var(--vt-surface)', color: 'var(--vt-text)',
+            textAlign: 'center',
+          }}
+        />
+      )}
     </td>
   )
 }

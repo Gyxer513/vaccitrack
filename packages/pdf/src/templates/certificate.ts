@@ -7,14 +7,17 @@ const fontsDir = resolve(__dirname, '..', '..', 'fonts')
 const FONT_REGULAR = readFileSync(resolve(fontsDir, 'DejaVuSans.ttf'))
 const FONT_BOLD = readFileSync(resolve(fontsDir, 'DejaVuSans-Bold.ttf'))
 
-export function generateCertificate(data: CertificateData): Buffer {
+export function generateCertificate(data: CertificateData): Promise<Buffer> {
   const chunks: Buffer[] = []
   const doc = new PDFDocument({ size: 'A5', margin: 30 })
+  const done = new Promise<Buffer>((resolve, reject) => {
+    doc.on('data', (chunk: Buffer) => chunks.push(chunk))
+    doc.on('end', () => resolve(Buffer.concat(chunks)))
+    doc.on('error', reject)
+  })
 
   doc.registerFont('body', FONT_REGULAR)
   doc.registerFont('bold', FONT_BOLD)
-
-  doc.on('data', (chunk: Buffer) => chunks.push(chunk))
 
   doc.font('bold').fontSize(13)
     .text('СЕРТИФИКАТ О ПРОФИЛАКТИЧЕСКИХ ПРИВИВКАХ', { align: 'center' })
@@ -52,7 +55,7 @@ export function generateCertificate(data: CertificateData): Buffer {
     .fillColor('#000')
 
   doc.end()
-  return Buffer.concat(chunks)
+  return done
 }
 
 function kv(doc: PDFKit.PDFDocument, label: string, value: string) {

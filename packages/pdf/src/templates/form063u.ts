@@ -13,15 +13,18 @@ const PAGE_MARGIN = 30
 const PAGE_WIDTH = 595.28  // A4 pts
 const CONTENT_W = PAGE_WIDTH - PAGE_MARGIN * 2
 
-export function generateForm063u(data: Form063Data): Buffer {
+export function generateForm063u(data: Form063Data): Promise<Buffer> {
   const chunks: Buffer[] = []
   const doc = new PDFDocument({ size: 'A4', margin: PAGE_MARGIN })
+  const done = new Promise<Buffer>((resolve, reject) => {
+    doc.on('data', (chunk: Buffer) => chunks.push(chunk))
+    doc.on('end', () => resolve(Buffer.concat(chunks)))
+    doc.on('error', reject)
+  })
 
   doc.registerFont('body', FONT_REGULAR)
   doc.registerFont('bold', FONT_BOLD)
   doc.font('body')
-
-  doc.on('data', (chunk: Buffer) => chunks.push(chunk))
 
   /* ——— шапка ——— */
   doc.fontSize(7)
@@ -71,7 +74,7 @@ export function generateForm063u(data: Form063Data): Buffer {
   doc.text(`Причина: __________________________________________________________________`, PAGE_MARGIN, y + 28)
 
   doc.end()
-  return Buffer.concat(chunks)
+  return done
 }
 
 /* ——— вспомогательные рендеры ——— */

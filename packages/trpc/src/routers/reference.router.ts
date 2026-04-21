@@ -11,6 +11,7 @@ export const referenceRouter = router({
   schedules: protectedProcedure.query(({ ctx }) =>
     ctx.prisma.vaccineSchedule.findMany({
       where: { isActive: true },
+      include: { parent: true },
       orderBy: { code: 'asc' },
     }),
   ),

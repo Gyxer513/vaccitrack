@@ -176,9 +176,23 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
       .filter((e) => {
         if (statusFilter !== 'all' && e.status !== statusFilter) return false
         if (!needle) return true
-        return e.schedule.name.toLowerCase().includes(needle)
+        return (
+          e.schedule.name.toLowerCase().includes(needle) ||
+          (e.schedule.parent?.name ?? '').toLowerCase().includes(needle)
+        )
       })
-      .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.schedule.name.localeCompare(b.schedule.name))
+      .sort((a, b) => {
+        // 1) приоритет по статусу
+        const byStatus = STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
+        if (byStatus !== 0) return byStatus
+        // 2) внутри — алфавитом по нозологии (parent.name), fallback — сам name
+        const aDisease = a.schedule.parent?.name ?? a.schedule.name
+        const bDisease = b.schedule.parent?.name ?? b.schedule.name
+        const byDisease = aDisease.localeCompare(bDisease)
+        if (byDisease !== 0) return byDisease
+        // 3) внутри одной нозологии — по имени этапа
+        return a.schedule.name.localeCompare(b.schedule.name)
+      })
   }, [enrichedSchedules, statusFilter, scheduleSearch])
 
   // Авто-выбор первой записи в видимом списке, если ничего не выбрано
@@ -444,8 +458,17 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
                         }}
                       >
                         <div className="vt-vac-item-main">
-                          <div className="vt-vac-item-title">{s.name}</div>
-                          {d.subtitle && <div className="vt-vac-item-sub">{d.subtitle}</div>}
+                          {s.parent ? (
+                            <>
+                              <div className="vt-vac-item-title">{s.parent.name}</div>
+                              <div className="vt-vac-item-sub">{s.name}</div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="vt-vac-item-title">{s.name}</div>
+                              {d.subtitle && <div className="vt-vac-item-sub">{d.subtitle}</div>}
+                            </>
+                          )}
                         </div>
                         <div className="vt-vac-item-meta">
                           {last && (
@@ -467,7 +490,11 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
               <div className="vt-card vt-vac-form" data-cat={display.color}>
                 <div className="vt-vac-form-head">
                   <IconSparkles size={14} />
-                  <span>{schedule?.name ?? '—'}</span>
+                  <span>
+                    {schedule?.parent
+                      ? `${schedule.parent.name} · ${schedule.name}`
+                      : schedule?.name ?? '—'}
+                  </span>
                 </div>
 
                 <div className="vt-vac-cols-2-tight">
@@ -633,7 +660,14 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
 
               {mode === 'vaccination' ? (
                 <div className="vt-vac-preview-body">
-                  <PreviewRow label="Нозология" value={schedule?.name ?? '—'} accent />
+                  <PreviewRow
+                    label="Нозология"
+                    value={schedule?.parent ? schedule.parent.name : schedule?.name ?? '—'}
+                    accent
+                  />
+                  {schedule?.parent && (
+                    <PreviewRow label="Этап" value={schedule.name} />
+                  )}
                   <PreviewRow label="Препарат" value={currentVaccine?.name ?? '—'} strong />
                   <PreviewRow label="Дата" value={formatDateRu(date)} mono />
                   <PreviewRow label="Серия" value={series || '—'} mono />
@@ -645,7 +679,14 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
                 </div>
               ) : (
                 <div className="vt-vac-preview-body">
-                  <PreviewRow label="Отвод от" value={schedule?.name ?? '—'} accent />
+                  <PreviewRow
+                    label="Отвод от"
+                    value={schedule?.parent ? schedule.parent.name : schedule?.name ?? '—'}
+                    accent
+                  />
+                  {schedule?.parent && (
+                    <PreviewRow label="Этап" value={schedule.name} />
+                  )}
                   <PreviewRow label="Причина" value={currentExemption?.name ?? '—'} strong />
                   <PreviewRow label="С" value={formatDateRu(date)} mono />
                   <PreviewRow

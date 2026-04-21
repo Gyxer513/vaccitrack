@@ -7,3 +7,5 @@ dist
 .DS_Store
 .idea
 .vscode
+__pycache__/
+scripts/f063_extracted.txt

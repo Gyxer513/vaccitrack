@@ -507,7 +507,7 @@ function AssignmentsTable({
           <button
             className="vt-btn vt-btn-ghost vt-btn-sm"
             style={{ marginTop: 10 }}
-            onClick={() => setShowAll(true)}
+            onClick={() => setOpen(true)}
           >
             + Добавить процедуру
           </button>

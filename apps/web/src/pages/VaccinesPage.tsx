@@ -244,7 +244,7 @@ export function VaccinesPage() {
           <h1 className="vt-page-title" style={{ fontSize: 20 }}>Вакцины</h1>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'stretch' }}>
           <input
             className="vt-input"
             placeholder="Поиск…"
@@ -253,10 +253,11 @@ export function VaccinesPage() {
             style={{ flex: 1 }}
           />
           <button
-            className="vt-btn vt-btn-primary vt-btn-sm"
+            className="vt-btn vt-btn-primary"
             onClick={handleCreate}
             disabled={busy}
             title="Создать новую вакцину"
+            style={{ width: 40, padding: 0, flexShrink: 0 }}
           >
             +
           </button>

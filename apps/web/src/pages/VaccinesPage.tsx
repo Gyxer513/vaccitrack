@@ -459,7 +459,41 @@ export function VaccinesPage() {
 
 /* ————— Таблица назначений ————— */
 
-type Schedule = { id: string; name: string; code: string; parent: { id: string; name: string } | null }
+type Schedule = {
+  id: string
+  name: string
+  code: string
+  parent: { id: string; name: string } | null
+  minAgeYears: number
+  minAgeMonths: number
+  minAgeDays: number
+  maxAgeYears: number
+  maxAgeMonths: number
+  maxAgeDays: number
+}
+
+// Компактное представление возраста: "3 мес", "1 г 6 мес", "7 л", …
+function fmtAge(y: number, m: number, d: number): string {
+  const parts: string[] = []
+  if (y > 0) parts.push(`${y} ${y === 1 ? 'г' : y < 5 ? 'г' : 'л'}`)
+  if (m > 0) parts.push(`${m} мес`)
+  if (d > 0 && y === 0) parts.push(`${d} дн`)
+  if (parts.length === 0) return '0'
+  return parts.join(' ')
+}
+
+// Диапазон "от X до Y" или "любой", "от X", "до Y".
+function fmtAgeRange(
+  minY: number, minM: number, minD: number,
+  maxY: number, maxM: number, maxD: number,
+): string {
+  const isMinZero = minY === 0 && minM === 0 && minD === 0
+  const isMaxInfinite = maxY >= 99
+  if (isMinZero && isMaxInfinite) return 'любой возраст'
+  if (isMinZero) return `до ${fmtAge(maxY, maxM, maxD)}`
+  if (isMaxInfinite) return `от ${fmtAge(minY, minM, minD)}`
+  return `${fmtAge(minY, minM, minD)} — ${fmtAge(maxY, maxM, maxD)}`
+}
 
 type CreatedSchedule = Schedule & ScheduleAge
 
@@ -621,15 +655,39 @@ function AssignmentsTable({
                         type="button"
                         onClick={() => { onToggle(s.id); setQ('') }}
                         style={{
-                          display: 'block', width: '100%', textAlign: 'left',
-                          padding: '8px 12px', background: 'transparent',
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          width: '100%', textAlign: 'left',
+                          padding: '10px 12px', background: 'transparent',
                           border: 'none', borderBottom: '1px solid var(--vt-border)',
                           fontFamily: 'inherit', fontSize: 13, cursor: 'pointer',
                           color: 'var(--vt-text)',
                         }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--vt-surface-tint)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                       >
-                        <span style={{ fontWeight: 500 }}>{s.parent?.name ?? '—'}</span>
-                        <span className="vt-hint"> · {s.name}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div>
+                            <span style={{ fontWeight: 500 }}>{s.parent?.name ?? '—'}</span>
+                            <span className="vt-hint"> · {s.name}</span>
+                          </div>
+                        </div>
+                        <span
+                          className="vt-mono"
+                          style={{
+                            fontSize: 11,
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                            background: 'var(--vt-bg-warm)',
+                            color: 'var(--vt-muted)',
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {fmtAgeRange(
+                            s.minAgeYears, s.minAgeMonths, s.minAgeDays,
+                            s.maxAgeYears, s.maxAgeMonths, s.maxAgeDays,
+                          )}
+                        </span>
                       </button>
                     ))}
                   </div>

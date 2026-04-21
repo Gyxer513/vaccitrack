@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { prisma } from '@vaccitrack/db'
 import { generateForm063u, generateCertificate } from '@vaccitrack/pdf'
-import type { Form063Row, Form063OtherRow } from '@vaccitrack/pdf'
+import type { Form063Row, Form063OtherRow, VacRevSplit } from '@vaccitrack/pdf'
 
 type RecordWithRefs = Awaited<ReturnType<typeof loadRecords>>[number]
 
@@ -97,6 +97,18 @@ function dedupOther(rs: RecordWithRefs[]): Form063OtherRow[] {
   return Array.from(seen.values())
 }
 
+// Разделение записей на Вакцинация vs Ревакцинация по имени этапа.
+function splitByVacRev(rs: RecordWithRefs[]): VacRevSplit {
+  const vac: RecordWithRefs[] = []
+  const rev: RecordWithRefs[] = []
+  for (const r of rs) {
+    const step = (r.vaccineSchedule?.name ?? '').toLowerCase()
+    if (step.includes('ревакц') || /\b(rv|r\s*v)\b/i.test(step)) rev.push(r)
+    else vac.push(r)
+  }
+  return { vaccination: dedupRows(vac), revaccination: dedupRows(rev) }
+}
+
 @Injectable()
 export class DocumentsService {
   async form063u(patientId: string, orgId: string): Promise<Buffer> {
@@ -122,9 +134,10 @@ export class DocumentsService {
         .filter(Boolean).join(', '),
       policySerial: patient.policySerial ?? '',
       policyNumber: patient.policyNumber ?? '',
-      tuberculosis: dedupRows(buckets.tuberculosis),
+      tuberculosis: splitByVacRev(buckets.tuberculosis),
+      tubeTests: [], // T_NOZ20 пока не импортируется (другой формат)
       polio: dedupRows(buckets.polio),
-      dtk: dedupRows(buckets.dtk),
+      dtk: splitByVacRev(buckets.dtk),
       mumps: dedupRows(buckets.mumps),
       measles: dedupRows(buckets.measles),
       rubella: dedupRows(buckets.rubella),

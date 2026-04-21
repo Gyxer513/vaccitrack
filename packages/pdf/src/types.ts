@@ -1,8 +1,8 @@
 export type Form063Row = {
-  step: string         // Вакцинация / Ревакцинация / V / 1RV / …
-  ageLabel: string     // 3м, 1г 2м
+  step: string         // Вакцинация / 1V / 1RV / …
+  ageLabel: string     // 3дн., 1г.2м.
   date: string         // 11.10.2016
-  dose: string         // 1 / 0 / 0.5
+  dose: string
   series: string
   vaccineName: string
   reaction: string
@@ -10,7 +10,7 @@ export type Form063Row = {
 }
 
 export type Form063OtherRow = {
-  diseaseName: string  // Ветряная оспа, Гемофильная инфекция, Менингококк
+  diseaseName: string
   step: string
   ageLabel: string
   date: string
@@ -18,6 +18,16 @@ export type Form063OtherRow = {
   series: string
   vaccineName: string
   reaction: string
+}
+
+export type TubeTestRow = {
+  date: string
+  result: string
+}
+
+export type VacRevSplit = {
+  vaccination: Form063Row[]
+  revaccination: Form063Row[]
 }
 
 export type Form063Data = {
@@ -33,9 +43,10 @@ export type Form063Data = {
   policySerial: string
   policyNumber: string
 
-  tuberculosis: Form063Row[]
+  tuberculosis: VacRevSplit
+  tubeTests: TubeTestRow[]
   polio: Form063Row[]
-  dtk: Form063Row[]       // дифтерия + коклюш + столбняк
+  dtk: VacRevSplit          // дифтерия + коклюш + столбняк
   mumps: Form063Row[]
   measles: Form063Row[]
   rubella: Form063Row[]

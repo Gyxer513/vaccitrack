@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { trpc } from '../lib/trpc'
+import { useConfirm, useToast } from '../components/ui/Dialog'
 
 type VaccineListItem = {
   id: string
@@ -54,6 +55,8 @@ export function VaccinesPage() {
   const vaccinesQ = trpc.vaccine.list.useQuery()
   const schedulesQ = trpc.schedule.list.useQuery()
   const utils = trpc.useUtils()
+  const confirm = useConfirm()
+  const toast = useToast()
 
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -191,14 +194,26 @@ export function VaccinesPage() {
       if (isDraft) {
         setIsDraft(false)
         setSelectedId(vaccineId)
+        toast.success('Вакцина создана')
+      } else {
+        toast.success('Сохранено')
       }
     } catch (e: any) {
       setError(e.message ?? 'Ошибка сохранения')
+      toast.error(e.message ?? 'Ошибка сохранения')
     }
   }
 
-  const handleCancelEdit = () => {
-    if (dirty && !confirm('Отбросить несохранённые изменения?')) return
+  const handleCancelEdit = async () => {
+    if (dirty) {
+      const ok = await confirm({
+        title: 'Отбросить изменения?',
+        message: 'Несохранённые изменения будут потеряны.',
+        confirmLabel: 'Отбросить',
+        danger: true,
+      })
+      if (!ok) return
+    }
     if (isDraft) {
       // Черновик не был в БД — просто выбросим его.
       setIsDraft(false)
@@ -244,14 +259,21 @@ export function VaccinesPage() {
 
   const handleDelete = async () => {
     if (!selected) return
-    if (!confirm(`Удалить вакцину «${selected.name}»? Связи и ссылки из записей о прививках будут разорваны.`)) return
+    const ok = await confirm({
+      title: `Удалить вакцину «${selected.name}»?`,
+      message: 'Связи с прививочным календарём будут разорваны, ссылки из записей о прививках обнулятся. Сами записи о прививках сохранятся.',
+      confirmLabel: 'Удалить',
+      danger: true,
+    })
+    if (!ok) return
     setError(null)
     try {
       await deleteVaccine.mutateAsync({ id: selected.id })
       await utils.vaccine.list.invalidate()
       setSelectedId(null)
+      toast.success('Вакцина удалена')
     } catch (e: any) {
-      setError(e.message ?? 'Ошибка удаления')
+      toast.error(e.message ?? 'Ошибка удаления')
     }
   }
 
@@ -292,9 +314,18 @@ export function VaccinesPage() {
             <button
               key={v.id}
               type="button"
-              onClick={() => {
-                if (dirty && !confirm('Есть несохранённые изменения. Отбросить?')) return
+              onClick={async () => {
+                if (dirty) {
+                  const ok = await confirm({
+                    title: 'Отбросить изменения?',
+                    message: 'У текущей вакцины есть несохранённые изменения.',
+                    confirmLabel: 'Отбросить',
+                    danger: true,
+                  })
+                  if (!ok) return
+                }
                 setIsDraft(false)
+                setDirty(false)
                 setSelectedId(v.id)
               }}
               style={{

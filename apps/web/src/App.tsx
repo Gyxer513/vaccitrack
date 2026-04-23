@@ -5,6 +5,8 @@ import { PatientDetailPage } from './pages/PatientDetailPage'
 import { NewPatientPage } from './pages/NewPatientPage'
 import { PlanPage } from './pages/PlanPage'
 import { NewVaccinationPage } from './pages/NewVaccinationPage'
+import { VaccinesPage } from './pages/VaccinesPage'
+import { ErrorPage } from './pages/ErrorPage'
 
 export default function App() {
   return (
@@ -21,6 +23,18 @@ export default function App() {
             <Route path="/patients/new" element={<NewPatientPage />} />
             <Route path="/patients/:id" element={<PatientDetailPage />} />
             <Route path="/plan" element={<PlanPage />} />
+            <Route path="/vaccines" element={<VaccinesPage />} />
+            {/* Неизвестный маршрут */}
+            <Route
+              path="*"
+              element={
+                <ErrorPage
+                  code="404"
+                  title="Страница не найдена"
+                  message="Возможно, адрес устарел, или страница была удалена."
+                />
+              }
+            />
           </Routes>
         </Layout>
       } />

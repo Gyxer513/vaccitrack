@@ -16,10 +16,8 @@ type Form = {
   riskGroupId: string
   policySerial: string
   policyNumber: string
-  cityName: string
-  streetName: string
-  house: string
-  apartment: string
+  hasDirectContract: boolean
+  directContractNumber: string
   isDecret: boolean
 }
 
@@ -35,10 +33,8 @@ const INITIAL: Form = {
   riskGroupId: '',
   policySerial: '',
   policyNumber: '',
-  cityName: '',
-  streetName: '',
-  house: '',
-  apartment: '',
+  hasDirectContract: false,
+  directContractNumber: '',
   isDecret: false,
 }
 
@@ -83,20 +79,23 @@ export function NewPatientPage() {
       birthday: parseLocalDate(f.birthday),
       phone: f.phone.trim() || undefined,
       districtId: f.districtId || undefined,
-      insuranceId: f.insuranceId || undefined,
+      insuranceId: f.hasDirectContract ? undefined : (f.insuranceId || undefined),
+      hasDirectContract: f.hasDirectContract,
+      directContractNumber: f.hasDirectContract
+        ? (f.directContractNumber.trim() || undefined)
+        : undefined,
       riskGroupId: f.riskGroupId || undefined,
-      policySerial: f.policySerial.trim() || undefined,
-      policyNumber: f.policyNumber.trim() || undefined,
-      cityName: f.cityName.trim() || undefined,
-      streetName: f.streetName.trim() || undefined,
-      house: f.house.trim() || undefined,
-      apartment: f.apartment.trim() || undefined,
+      policySerial: f.hasDirectContract ? undefined : (f.policySerial.trim() || undefined),
+      policyNumber: f.hasDirectContract ? undefined : (f.policyNumber.trim() || undefined),
       isDecret: f.isDecret,
     })
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 22, maxWidth: 880 }}>
+    <form
+      onSubmit={handleSubmit}
+      style={{ display: 'grid', gap: 22, maxWidth: 880, margin: '0 auto', width: '100%' }}
+    >
       <div>
         <div style={{ fontSize: 13, marginBottom: 6 }}>
           <Link to="/patients" className="vt-muted" style={{ textDecoration: 'none' }}>
@@ -167,46 +166,17 @@ export function NewPatientPage() {
         </div>
       </div>
 
-      {/* АДРЕС */}
-      <div className="vt-card" style={{ padding: 22, display: 'grid', gap: 16 }}>
-        <div className="vt-section-title">Адрес</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 120px 120px', gap: 12 }}>
-          <Field label="Город">
-            <input className="vt-input" value={f.cityName} onChange={(e) => set('cityName', e.target.value)} />
-          </Field>
-          <Field label="Улица">
-            <input className="vt-input" value={f.streetName} onChange={(e) => set('streetName', e.target.value)} />
-          </Field>
-          <Field label="Дом">
-            <input className="vt-input vt-mono" value={f.house} onChange={(e) => set('house', e.target.value)} />
-          </Field>
-          <Field label="Кв.">
-            <input className="vt-input vt-mono" value={f.apartment} onChange={(e) => set('apartment', e.target.value)} />
-          </Field>
-        </div>
-      </div>
-
-      {/* МЕДИЦИНСКАЯ ЧАСТЬ */}
+      {/* ПРИКРЕПЛЕНИЕ И СТРАХОВАНИЕ */}
       <div className="vt-card" style={{ padding: 22, display: 'grid', gap: 16 }}>
         <div className="vt-section-title">Прикрепление и страховка</div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="Участок">
             <select className="vt-select" value={f.districtId} onChange={(e) => set('districtId', e.target.value)}>
               <option value="">— не указан —</option>
               {districtsQ.data?.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.code} — {d.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Страховая компания">
-            <select className="vt-select" value={f.insuranceId} onChange={(e) => set('insuranceId', e.target.value)}>
-              <option value="">— не указана —</option>
-              {insurancesQ.data?.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name}
                 </option>
               ))}
             </select>
@@ -223,31 +193,78 @@ export function NewPatientPage() {
           </Field>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 1fr', gap: 12 }}>
-          <Field label="Серия полиса">
-            <input className="vt-input vt-mono" value={f.policySerial} onChange={(e) => set('policySerial', e.target.value)} />
-          </Field>
-          <Field label="Номер полиса">
-            <input className="vt-input vt-mono" value={f.policyNumber} onChange={(e) => set('policyNumber', e.target.value)} />
-          </Field>
-          <Field label="Декретированная группа">
-            <label
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10, height: 42,
-                padding: '0 14px', border: '1.5px solid var(--vt-input-border)',
-                borderRadius: 10, background: 'var(--vt-input-bg)', cursor: 'pointer',
-                fontSize: 14,
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={f.isDecret}
-                onChange={(e) => set('isDecret', e.target.checked)}
-              />
-              {f.isDecret ? 'Да' : 'Нет'}
-            </label>
-          </Field>
+        {/* Переключатель ОМС / прямой договор */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 4,
+            padding: 4,
+            background: 'var(--vt-bg-warm)',
+            borderRadius: 10,
+          }}
+        >
+          <TabBtn
+            active={!f.hasDirectContract}
+            onClick={() => set('hasDirectContract', false)}
+          >
+            По ОМС
+          </TabBtn>
+          <TabBtn
+            active={f.hasDirectContract}
+            onClick={() => set('hasDirectContract', true)}
+          >
+            Прямой договор
+          </TabBtn>
         </div>
+
+        {f.hasDirectContract ? (
+          <Field label="Номер прямого договора">
+            <input
+              className="vt-input vt-mono"
+              value={f.directContractNumber}
+              onChange={(e) => set('directContractNumber', e.target.value)}
+              placeholder="например, ЛРЦ-2026/0423"
+            />
+          </Field>
+        ) : (
+          <>
+            <Field label="Страховая компания">
+              <select className="vt-select" value={f.insuranceId} onChange={(e) => set('insuranceId', e.target.value)}>
+                <option value="">— не указана —</option>
+                {insurancesQ.data?.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 12 }}>
+              <Field label="Серия полиса">
+                <input className="vt-input vt-mono" value={f.policySerial} onChange={(e) => set('policySerial', e.target.value)} />
+              </Field>
+              <Field label="Номер полиса">
+                <input className="vt-input vt-mono" value={f.policyNumber} onChange={(e) => set('policyNumber', e.target.value)} />
+              </Field>
+            </div>
+          </>
+        )}
+
+        <label
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 14px', border: '1.5px solid var(--vt-input-border)',
+            borderRadius: 10, background: 'var(--vt-input-bg)', cursor: 'pointer',
+            fontSize: 13,
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={f.isDecret}
+            onChange={(e) => set('isDecret', e.target.checked)}
+          />
+          Декретированная группа
+        </label>
       </div>
 
       {error && (
@@ -284,5 +301,29 @@ function Field({ label, required, children }: { label: string; required?: boolea
       </label>
       {children}
     </div>
+  )
+}
+
+function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: '9px 14px',
+        fontFamily: 'inherit',
+        fontSize: 13,
+        fontWeight: 500,
+        border: 'none',
+        borderRadius: 8,
+        cursor: 'pointer',
+        background: active ? 'var(--vt-surface)' : 'transparent',
+        color: active ? 'var(--vt-primary-hover)' : 'var(--vt-muted)',
+        boxShadow: active ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+        transition: 'all .15s',
+      }}
+    >
+      {children}
+    </button>
   )
 }

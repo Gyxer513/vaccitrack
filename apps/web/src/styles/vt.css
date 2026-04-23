@@ -477,3 +477,13 @@ html, body, #root {
 /* ————— Utility ————— */
 .vt-row { display: flex; gap: 12px; align-items: center; }
 .vt-spacer { flex: 1; }
+
+/* ————— Анимации для модалок и тостов ————— */
+@keyframes vt-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes vt-pop-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}

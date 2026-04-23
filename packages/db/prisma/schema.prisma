@@ -208,6 +208,9 @@ model Patient {
   policySerial String?
   policyNumber String?
 
+  hasDirectContract    Boolean @default(false)
+  directContractNumber String?
+
   isResident Boolean @default(true)
   isAlive    Boolean @default(true)
   isDecret   Boolean @default(false)

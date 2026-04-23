@@ -166,10 +166,9 @@ export function PatientDetailPage() {
             Записать прививку
           </button>
           <a
-            href={`/api/v1/documents/patients/${id}/form063u`}
-            target="_blank"
-            rel="noreferrer"
+            href={`/api/v1/documents/patients/${id}/form063u.docx`}
             className="vt-btn vt-btn-ghost"
+            title="Скачать Word-документ (можно дописать от руки)"
           >
             063/у ↓
           </a>

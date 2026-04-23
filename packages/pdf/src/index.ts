@@ -1,3 +1,11 @@
 export { generateForm063u } from './templates/form063u'
+export { generateForm063uDocx } from './templates/form063u-docx'
 export { generateCertificate } from './templates/certificate'
-export type { Form063Data, CertificateData, VaccinationRow } from './types'
+export type {
+  Form063Data,
+  Form063Row,
+  Form063OtherRow,
+  TubeTestRow,
+  VacRevSplit,
+  CertificateData,
+} from './types'

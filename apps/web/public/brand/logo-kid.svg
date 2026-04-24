@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 56" width="320" height="56">
+  <g transform="translate(0,4)">
+    <path d="M24 6 C 24 6, 12 18, 12 28 a12 12 0 0 0 24 0 C 36 18, 24 6, 24 6 Z" fill="#2D5240"></path>
+    <path d="M14 30 L19 30 L21 25 L24 35 L27 28 L29 30 L34 30" stroke="#FBF8F1" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"></path>
+  </g>
+  <text x="56" y="40" font-family="Cormorant Garamond, Georgia, serif" font-size="36" font-weight="500" fill="#1F2A24" letter-spacing="0.003em">Immunova</text>
+</svg>

@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import './VaccinationForm.css'
 import {
   IconActivity,
   IconAlertCircle,
-  IconArrowLeft,
   IconCheck,
   IconChevronRight,
   IconClock,
@@ -287,10 +286,16 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
     <div className="vt-vac">
       <div className="vt-vac-inner">
         {/* HEADER */}
+        <div style={{ fontSize: 13, marginBottom: 6 }}>
+          <Link
+            to={`/patients/${patientId}`}
+            className="vt-muted"
+            style={{ textDecoration: 'none' }}
+          >
+            ← К карточке пациента
+          </Link>
+        </div>
         <div className="vt-vac-head">
-          <button className="vt-btn-icon" onClick={() => navigate(`/patients/${patientId}`)} aria-label="Назад">
-            <IconArrowLeft size={16} />
-          </button>
           <h1 className="vt-vac-title">
             Запись <em>прививки</em>
           </h1>
@@ -308,7 +313,7 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
               <div className="vt-vac-patient-top">
                 <div className="vt-avatar vt-vac-avatar-lg">{initials || '?'}</div>
                 <div className="vt-vac-patient-name-wrap">
-                  <div className="vt-display vt-vac-patient-name">{fullName}</div>
+                  <div className="vt-vac-patient-name">{fullName}</div>
                   <div className="vt-vac-patient-meta">
                     {age != null ? `${age} лет` : ''} · {patient.sex === 'FEMALE' ? 'женщина' : 'мужчина'}
                   </div>

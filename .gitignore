@@ -9,3 +9,9 @@ dist
 .vscode
 __pycache__/
 scripts/f063_extracted.txt
+
+# Локальные варианты скриптов с ПД — не для репо
+scripts/*.local.py
+
+# Локальный docker-compose override (dev-порты и пр.)
+docker-compose.override.yml

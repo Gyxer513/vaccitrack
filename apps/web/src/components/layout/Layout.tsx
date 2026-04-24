@@ -11,7 +11,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="vt-app">
       <header className="vt-topbar">
-        <div className="vt-brand">VacciTrack</div>
+        <Link to="/" className="vt-brand" aria-label="Immunova — на главную">
+          <BrandMark />
+          <span>Immunova</span>
+        </Link>
         <nav className="vt-nav">
           {nav.map((n) => (
             <Link
@@ -29,5 +32,32 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </header>
       <main className="vt-main">{children}</main>
     </div>
+  )
+}
+
+// Знак-капля с кардио-линией. Заливка по текущему цвету темы (var(--accent)),
+// ECG-линия — кремовая, читается поверх любой глубины акцента.
+function BrandMark() {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      width="26"
+      height="26"
+      aria-hidden="true"
+      style={{ color: 'var(--vt-primary)', flexShrink: 0 }}
+    >
+      <path
+        d="M24 6 C 24 6, 12 18, 12 28 a12 12 0 0 0 24 0 C 36 18, 24 6, 24 6 Z"
+        fill="currentColor"
+      />
+      <path
+        d="M14 30 L19 30 L21 25 L24 35 L27 28 L29 30 L34 30"
+        stroke="var(--vt-surface)"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
   )
 }

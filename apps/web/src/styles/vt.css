@@ -1,40 +1,42 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Immunova · детская тема (kid)
+   Шрифты подключаются в apps/web/index.html (Cormorant Garamond + Inter Tight + JetBrains Mono).
+   Палитра синхронизирована с brand/tokens.css (Immunova design tokens). */
 
 :root {
-  /* Surfaces */
-  --vt-bg: #F6F1E8;
+  /* Surfaces (brand: bg-page/surface/alt/border/border-strong) */
+  --vt-bg: #F5F1E8;
   --vt-bg-warm: #EFE8D7;
-  --vt-surface: #FFFEFA;
-  --vt-surface-tint: #FAF6EC;
-  --vt-border: #E8E0D0;
-  --vt-border-strong: #D4CCB8;
-  --vt-input-bg: #FFFEFA;
-  --vt-input-border: #E8E0D0;
+  --vt-surface: #FBF8F1;
+  --vt-surface-tint: #F5F1E8;
+  --vt-border: #E2D9C2;
+  --vt-border-strong: #C9BC9B;
+  --vt-input-bg: #FBF8F1;
+  --vt-input-border: #E2D9C2;
 
-  /* Text */
-  --vt-text: #1E2723;
-  --vt-muted: #7A7260;
-  --vt-hint: #9C9382;
+  /* Text (brand: ink / ink-soft / ink-mute) */
+  --vt-text: #1F2A24;
+  --vt-muted: #5C6B62;
+  --vt-hint: #8C9A90;
 
-  /* Brand (moss) */
-  --vt-primary: #4A8C72;
-  --vt-primary-hover: #3B7560;
-  --vt-primary-soft: #66A186;
-  --vt-accent: #4A8C72;
-  --vt-accent-bg: #E6F0ED;
-  --vt-accent-border: #A5D0C3;
-  --vt-accent-text: #2D5A48;
+  /* Brand accent (deep moss) — brand: accent / accent-deep / accent-soft / accent-ink */
+  --vt-primary: #2D5240;
+  --vt-primary-hover: #1F3B2D;
+  --vt-primary-soft: #4A7560;
+  --vt-accent: #2D5240;
+  --vt-accent-bg: #D8E2D9;
+  --vt-accent-border: #A5C0AD;
+  --vt-accent-text: #1F3B2D;
 
-  /* Warning (amber) */
-  --vt-warning-bg: #FDF2DA;
-  --vt-warning-border: #E5B04A;
-  --vt-warning-text: #7A5210;
+  /* Warning (brand: warn / warn-soft) */
+  --vt-warning-bg: #F4E5C7;
+  --vt-warning-border: #C18A3B;
+  --vt-warning-text: #6B4A10;
 
-  /* Danger (coral) */
-  --vt-danger: #C95D3E;
-  --vt-danger-bg: #FDEFEA;
-  --vt-danger-border: #F4DBC8;
-  --vt-danger-text: #8B3A20;
+  /* Danger (brand: danger) */
+  --vt-danger: #A04030;
+  --vt-danger-bg: #F5E3DE;
+  --vt-danger-border: #E2B5A8;
+  --vt-danger-text: #6B2820;
 
   /* Violet (group/badge) */
   --vt-violet-bg: #EDE7F7;
@@ -77,16 +79,40 @@
   --vt-cat-rose-text: #7A2848;
   --vt-cat-rose-deep: #B04568;
 
-  /* Fonts */
-  --vt-font-body: 'Inter Tight', system-ui, -apple-system, sans-serif;
-  --vt-font-display: 'Fraunces', Georgia, serif;
+  /* Fonts (brand: font-sans / font-serif) */
+  --vt-font-body: 'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif;
+  --vt-font-display: 'Cormorant Garamond', 'Source Serif Pro', Georgia, serif;
   --vt-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* Interop-алиасы брэнд-токенов tokens.css — чтобы любые блоки, написанные
+   на var(--accent)/var(--ink) работали сразу. */
+:root {
+  --bg-page: var(--vt-bg);
+  --bg-surface: var(--vt-surface);
+  --bg-alt: var(--vt-bg-warm);
+  --border: var(--vt-border);
+  --border-strong: var(--vt-border-strong);
+  --ink: var(--vt-text);
+  --ink-soft: var(--vt-muted);
+  --ink-mute: var(--vt-hint);
+  --accent: var(--vt-primary);
+  --accent-deep: var(--vt-primary-hover);
+  --accent-soft: var(--vt-accent-bg);
+  --accent-ink: var(--vt-surface);
+  --warn: var(--vt-warning-border);
+  --warn-soft: var(--vt-warning-bg);
+  --danger: var(--vt-danger);
+  --font-serif: var(--vt-font-display);
+  --font-sans: var(--vt-font-body);
 }
 
 html, body, #root {
   background: var(--vt-bg);
   color: var(--vt-text);
   font-family: var(--vt-font-body);
+  font-size: 16px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -104,27 +130,22 @@ html, body, #root {
 
 .vt-brand {
   font-family: var(--vt-font-display);
-  font-size: 19px;
-  font-weight: 600;
+  font-size: 22px;
+  font-weight: 500;
   color: var(--vt-text);
-  letter-spacing: -0.02em;
-  display: flex;
+  letter-spacing: 0.005em;
+  display: inline-flex;
   align-items: center;
   gap: 10px;
+  text-decoration: none;
 }
-.vt-brand::before {
-  content: '';
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: var(--vt-primary);
-  box-shadow: 0 0 0 3px var(--vt-accent-bg);
-}
+.vt-brand:hover { color: var(--vt-primary); }
 
 .vt-nav { display: flex; gap: 4px; }
 
 .vt-nav a {
-  font-size: 13px;
-  padding: 7px 14px;
+  font-size: 14px;
+  padding: 8px 15px;
   border-radius: 8px;
   color: var(--vt-muted);
   text-decoration: none;
@@ -138,9 +159,9 @@ html, body, #root {
 }
 
 .vt-topbar-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
-.vt-user { font-size: 13px; color: var(--vt-muted); }
+.vt-user { font-size: 14px; color: var(--vt-muted); }
 .vt-logout {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--vt-hint);
   background: none;
   border: none;
@@ -167,16 +188,17 @@ html, body, #root {
 }
 .vt-page-title {
   font-family: var(--vt-font-display);
-  font-size: 30px;
+  font-size: 36px;
   font-weight: 500;
   color: var(--vt-text);
-  letter-spacing: -0.03em;
+  letter-spacing: -0.015em;
   margin: 0;
+  line-height: 1.15;
 }
 .vt-page-sub {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--vt-muted);
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 /* ————— Cards ————— */
@@ -189,17 +211,17 @@ html, body, #root {
 
 .vt-section-title {
   font-family: var(--vt-font-display);
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 600;
   color: var(--vt-text);
   display: flex;
   align-items: center;
   gap: 10px;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.005em;
 }
 .vt-section-title::before {
   content: '';
-  width: 3px; height: 16px;
+  width: 3px; height: 18px;
   border-radius: 2px;
   background: var(--vt-primary);
   flex-shrink: 0;
@@ -210,9 +232,9 @@ html, body, #root {
   width: 100%;
   border: 1.5px solid var(--vt-input-border);
   border-radius: 10px;
-  padding: 11px 14px;
+  padding: 12px 14px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--vt-text);
   background: var(--vt-input-bg);
   transition: border-color .15s, box-shadow .15s, background .15s;
@@ -236,22 +258,22 @@ html, body, #root {
 
 .vt-label {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   color: var(--vt-muted);
-  margin-bottom: 7px;
+  margin-bottom: 8px;
 }
 .vt-label .req { color: var(--vt-danger); margin-left: 2px; }
 
 /* ————— Buttons ————— */
 .vt-btn {
-  height: 42px;
-  padding: 0 20px;
+  height: 44px;
+  padding: 0 22px;
   border-radius: 11px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   cursor: pointer;
   transition: all .15s;
@@ -298,9 +320,9 @@ html, body, #root {
   color: var(--vt-text);
 }
 .vt-btn-ghost:hover { background: var(--vt-bg-warm); border-color: var(--vt-border-strong); }
-.vt-btn-sm { height: 34px; padding: 0 14px; font-size: 13px; border-radius: 9px; }
+.vt-btn-sm { height: 36px; padding: 0 15px; font-size: 14px; border-radius: 9px; }
 .vt-btn-icon {
-  width: 34px; height: 34px;
+  width: 36px; height: 36px;
   padding: 0;
   border: 1.5px solid var(--vt-border);
   background: var(--vt-surface);
@@ -324,21 +346,21 @@ html, body, #root {
 .vt-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 15px;
 }
 .vt-table thead th {
   text-align: left;
   padding: 14px 20px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   color: var(--vt-muted);
   background: var(--vt-surface-tint);
   border-bottom: 1px solid var(--vt-border);
 }
 .vt-table tbody td {
-  padding: 14px 20px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--vt-border);
   color: var(--vt-text);
 }
@@ -350,19 +372,20 @@ html, body, #root {
   color: var(--vt-text);
   text-decoration: none;
   font-weight: 500;
-  font-family: var(--vt-font-display);
+  /* Sans (Inter Tight) — Cormorant слишком тонкий для ФИО в body-размере */
 }
 .vt-table a.vt-link:hover { color: var(--vt-primary-hover); }
 
 /* ————— Avatar ————— */
 .vt-avatar {
-  width: 34px; height: 34px;
+  width: 38px; height: 38px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--vt-primary) 0%, var(--vt-primary-hover) 100%);
   display: inline-flex; align-items: center; justify-content: center;
-  font-family: var(--vt-font-display);
-  font-size: 13px;
+  font-family: var(--vt-font-body);
+  font-size: 14px;
   font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--vt-surface);
   flex-shrink: 0;
   box-shadow: 0 2px 6px -2px rgba(45, 90, 72, 0.3);
@@ -371,16 +394,16 @@ html, body, #root {
 
 /* ————— Muted & badges ————— */
 .vt-muted { color: var(--vt-muted); }
-.vt-hint { color: var(--vt-hint); font-size: 12px; }
+.vt-hint { color: var(--vt-hint); font-size: 13px; }
 .vt-mono { font-family: var(--vt-font-mono); }
 .vt-display { font-family: var(--vt-font-display); }
 
 .vt-badge {
   display: inline-flex;
   align-items: center;
-  padding: 3px 9px;
+  padding: 4px 10px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 .vt-badge-warn { background: var(--vt-warning-bg); color: var(--vt-warning-text); border: 1px solid var(--vt-warning-border); }
@@ -393,9 +416,9 @@ html, body, #root {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 9px;
+  padding: 4px 10px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;

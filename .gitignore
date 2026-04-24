@@ -15,3 +15,6 @@ scripts/*.local.py
 
 # Локальный docker-compose override (dev-порты и пр.)
 docker-compose.override.yml
+
+# Claude dev-эргономика (launch.json и т.п.) — per-dev, не для репо
+.claude/

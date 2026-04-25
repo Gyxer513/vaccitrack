@@ -33,9 +33,24 @@ model Site {
   organization   Organization @relation(fields: [organizationId], references: [id])
   name           String
   address        String?
+  // Отделение: детское/взрослое. Определяет фильтрацию пациентов и UI-палитру.
+  dept           Dept         @default(KID)
 
   districts District[]
   doctors   Doctor[]
+}
+
+enum Dept {
+  KID
+  ADULT
+}
+
+// Скоуп календарной позиции — для какого отделения. BOTH = универсальная
+// (например, Covid-19, Гепатит А — могут быть и у детей, и у взрослых).
+enum ScheduleScope {
+  KID
+  ADULT
+  BOTH
 }
 
 model User {
@@ -122,6 +137,9 @@ model VaccineSchedule {
   shortName String?
   isActive  Boolean @default(true)
   isEpid    Boolean @default(false)
+  // Какому отделению принадлежит позиция календаря.
+  // BOTH — общая (например, грипп / Covid-19).
+  targetDept ScheduleScope @default(BOTH)
 
   minAgeYears  Int @default(0)
   minAgeMonths Int @default(0)

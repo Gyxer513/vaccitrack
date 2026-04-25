@@ -20,14 +20,19 @@ async function bootstrap() {
       router: appRouter,
       createContext: ({ req }) => {
         const token = req.headers.authorization?.split(' ')[1]
+        // Текущее отделение из заголовка x-dept (фронт прокидывает из контекста).
+        // По умолчанию — KID (детское — основное отделение клиники).
+        const rawDept = String(req.headers['x-dept'] ?? '').toUpperCase()
+        const dept: 'KID' | 'ADULT' = rawDept === 'ADULT' ? 'ADULT' : 'KID'
 
         // Dev bypass: без токена подставляем фиктивного пользователя с DEV_ORG_ID.
         const devFallback = () => {
           if (process.env.NODE_ENV === 'production' || !process.env.DEV_ORG_ID) {
-            return { prisma, user: null }
+            return { prisma, user: null, dept }
           }
           return {
             prisma,
+            dept,
             user: {
               sub: 'dev-user',
               login: 'dev',
@@ -45,6 +50,7 @@ async function bootstrap() {
           )
           return {
             prisma,
+            dept,
             user: {
               sub: payload.sub,
               login: payload.preferred_username,

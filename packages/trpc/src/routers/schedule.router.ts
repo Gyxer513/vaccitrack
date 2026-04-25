@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '../init'
+import { ScheduleScope } from '@vaccitrack/db'
 
 // Возрастные/интервальные поля — без часов (пользователю не нужно).
 const scheduleAgeFields = z.object({
@@ -26,7 +27,11 @@ export const scheduleRouter = router({
     // Включаем неактивные тоже — корневые записи (сами нозологии) в FoxPro
     // были L_PRIV=False, т.к. это не процедуры, а категории. UI сам
     // фильтрует их где не нужны (в списке «Добавить процедуру»).
+    // Фильтр по dept: своё отделение + универсальные (BOTH).
     ctx.prisma.vaccineSchedule.findMany({
+      where: {
+        targetDept: { in: [ctx.dept as unknown as ScheduleScope, ScheduleScope.BOTH] },
+      },
       include: { parent: true },
       orderBy: [{ parentId: 'asc' }, { code: 'asc' }],
     }),
@@ -50,6 +55,8 @@ export const scheduleRouter = router({
           // code — служебное поле из FoxPro. Для новых генерим простой uid-подобный ключ.
           code: `user_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           isActive: true,
+          // Создаваемая через UI позиция привязывается к текущему отделению.
+          targetDept: ctx.dept as unknown as ScheduleScope,
         },
       }),
     ),

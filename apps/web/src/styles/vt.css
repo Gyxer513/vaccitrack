@@ -85,6 +85,41 @@
   --vt-font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
+/* —— ADULT тема: индиго-палитра (взрослое отделение).
+   Переопределяет токены, остальной vt.css читает их через var(--vt-*) и
+   автоматически перекрашивается. Шрифты и категорические цвета не трогаем. */
+[data-dept="adult"] {
+  --vt-bg: #EEF1F6;
+  --vt-bg-warm: #E2E7F0;
+  --vt-surface: #F7F8FB;
+  --vt-surface-tint: #EEF1F6;
+  --vt-border: #D4DAE6;
+  --vt-border-strong: #A9B3C5;
+  --vt-input-bg: #F7F8FB;
+  --vt-input-border: #D4DAE6;
+
+  --vt-text: #101728;
+  --vt-muted: #46556F;
+  --vt-hint: #7C8AA3;
+
+  --vt-primary: #2A3A6E;
+  --vt-primary-hover: #1A2750;
+  --vt-primary-soft: #4A5C90;
+  --vt-accent: #2A3A6E;
+  --vt-accent-bg: #D8DEEE;
+  --vt-accent-border: #A9B3C5;
+  --vt-accent-text: #1A2750;
+
+  --vt-warning-bg: #F0E1C7;
+  --vt-warning-border: #A86A1F;
+  --vt-warning-text: #5C3A0F;
+
+  --vt-danger: #8B2E2A;
+  --vt-danger-bg: #F1DAD8;
+  --vt-danger-border: #D8AAA7;
+  --vt-danger-text: #5C1F1C;
+}
+
 /* Interop-алиасы брэнд-токенов tokens.css — чтобы любые блоки, написанные
    на var(--accent)/var(--ink) работали сразу. */
 :root {
@@ -159,6 +194,33 @@ html, body, #root {
 }
 
 .vt-topbar-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+
+/* ————— Department switcher (KID / ADULT) ————— */
+.vt-dept-switcher {
+  display: inline-flex;
+  background: var(--vt-bg-warm);
+  padding: 3px;
+  border-radius: 10px;
+  gap: 2px;
+}
+.vt-dept-switcher button {
+  background: transparent;
+  border: none;
+  padding: 6px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--vt-muted);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.vt-dept-switcher button:hover { color: var(--vt-text); }
+.vt-dept-switcher button.on {
+  background: var(--vt-surface);
+  color: var(--vt-primary-hover);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
 .vt-user { font-size: 14px; color: var(--vt-muted); }
 .vt-logout {
   font-size: 13px;

@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
+import { DepartmentSwitcher } from '../DepartmentSwitcher'
 
 const nav = [
   { to: '/patients', label: 'Пациенты' },
@@ -27,6 +28,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="vt-topbar-right">
+          <DepartmentSwitcher />
           <span className="vt-user">Администратор</span>
         </div>
       </header>

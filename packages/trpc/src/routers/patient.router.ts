@@ -34,6 +34,9 @@ export const patientRouter = router({
       const where = {
         organizationId: ctx.user.orgId,
         isAlive: true,
+        // Фильтр по текущему отделению: пациент относится к district →
+        // site → dept. Видим только пациентов своего отделения.
+        district: { site: { dept: ctx.dept } },
         ...(districtId && { districtId }),
         ...(search && {
           OR: [
@@ -64,7 +67,11 @@ export const patientRouter = router({
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.patient.findFirstOrThrow({
-        where: { id: input.id, organizationId: ctx.user.orgId },
+        where: {
+          id: input.id,
+          organizationId: ctx.user.orgId,
+          district: { site: { dept: ctx.dept } },
+        },
         include: {
           district: true,
           riskGroup: true,

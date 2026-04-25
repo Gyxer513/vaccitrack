@@ -1,6 +1,6 @@
 import { initTRPC, TRPCError } from '@trpc/server'
 import { ZodError } from 'zod'
-import type { PrismaClient } from '@vaccitrack/db'
+import type { PrismaClient, Dept } from '@vaccitrack/db'
 
 export type Context = {
   prisma: PrismaClient
@@ -11,6 +11,9 @@ export type Context = {
     orgId: string
     roles: string[]
   } | null
+  // Текущее отделение, выбранное пользователем (приходит в x-dept хедере).
+  // Сервер фильтрует пациентов / нозологии / врачей в его пределах.
+  dept: Dept
 }
 
 const t = initTRPC.context<Context>().create({

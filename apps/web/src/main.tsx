@@ -6,6 +6,7 @@ import { trpc, trpcClient } from './lib/trpc'
 import App from './App'
 import { ConfirmProvider, ToastProvider } from './components/ui/Dialog'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { DepartmentProvider } from './components/DepartmentProvider'
 import './index.css'
 import './styles/vt.css'
 
@@ -18,13 +19,15 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
-          <BrowserRouter>
-            <ToastProvider>
-              <ConfirmProvider>
-                <App />
-              </ConfirmProvider>
-            </ToastProvider>
-          </BrowserRouter>
+          <DepartmentProvider>
+            <BrowserRouter>
+              <ToastProvider>
+                <ConfirmProvider>
+                  <App />
+                </ConfirmProvider>
+              </ToastProvider>
+            </BrowserRouter>
+          </DepartmentProvider>
         </QueryClientProvider>
       </trpc.Provider>
     </ErrorBoundary>

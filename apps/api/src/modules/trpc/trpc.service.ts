@@ -7,14 +7,19 @@ import type { Request } from 'express'
 @Injectable()
 export class TrpcService {
   createContext = async ({ req }: { req: Request }): Promise<Context> => {
+    // Текущее отделение из заголовка (фронт берёт из DepartmentContext).
+    const rawDept = String(req.headers['x-dept'] ?? '').toUpperCase()
+    const dept: 'KID' | 'ADULT' = rawDept === 'ADULT' ? 'ADULT' : 'KID'
+
     const token = req.headers.authorization?.split(' ')[1]
-    if (!token) return { prisma, user: null }
+    if (!token) return { prisma, user: null, dept }
 
     try {
       // TODO: в проде заменить на jwks-rsa верификацию
       const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
       return {
         prisma,
+        dept,
         user: {
           sub: payload.sub,
           login: payload.preferred_username,
@@ -24,7 +29,7 @@ export class TrpcService {
         },
       }
     } catch {
-      return { prisma, user: null }
+      return { prisma, user: null, dept }
     }
   }
 

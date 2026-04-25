@@ -49,12 +49,12 @@ export class DocumentsController {
     res.send(buffer)
   }
 
-  @Get('patients/:id/certificate')
-  @ApiOperation({ summary: 'Скачать сертификат о вакцинации' })
-  async certificate(@Param('id') id: string, @Req() req: Request, @Res() res: Response) {
-    const buffer = await this.svc.certificate(id, resolveOrgId(req))
-    res.setHeader('Content-Type', 'application/pdf')
-    res.setHeader('Content-Disposition', `inline; filename="cert_${id}.pdf"`)
+  @Get('patients/:id/certificate.docx')
+  @ApiOperation({ summary: 'Скачать сертификат о профилактических прививках (Word)' })
+  async certificateDocx(@Param('id') id: string, @Req() req: Request, @Res() res: Response) {
+    const buffer = await this.svc.certificateDocx(id, resolveOrgId(req))
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    res.setHeader('Content-Disposition', `attachment; filename="certificate_${id}.docx"`)
     res.send(buffer)
   }
 }

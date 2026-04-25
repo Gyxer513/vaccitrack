@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { prisma } from '@vaccitrack/db'
-import { generateForm063u, generateForm063uDocx, generateCertificate } from '@vaccitrack/pdf'
-import type { Form063Data } from '@vaccitrack/pdf'
+import { generateForm063u, generateForm063uDocx, generateCertificateDocx } from '@vaccitrack/pdf'
+import type { Form063Data, CertificateData, CertificateSection } from '@vaccitrack/pdf'
 import type { Form063Row, Form063OtherRow, VacRevSplit } from '@vaccitrack/pdf'
 
 type RecordWithRefs = Awaited<ReturnType<typeof loadRecords>>[number]
@@ -155,31 +155,134 @@ export class DocumentsService {
     return generateForm063uDocx(await this.buildForm063uData(patientId, orgId))
   }
 
-  async certificate(patientId: string, orgId: string): Promise<Buffer> {
-    const patient = await prisma.patient.findFirst({
-      where: { id: patientId, organizationId: orgId },
-      include: {
-        vaccinationRecords: {
-          include: { vaccine: true, vaccineSchedule: true },
-          orderBy: { vaccinationDate: 'asc' },
-        },
-      },
-    })
+  async certificateDocx(patientId: string, orgId: string): Promise<Buffer> {
+    return generateCertificateDocx(await this.buildCertificateData(patientId, orgId))
+  }
+
+  private async buildCertificateData(patientId: string, orgId: string): Promise<CertificateData> {
+    const patient = await prisma.patient.findFirst({ where: { id: patientId, organizationId: orgId } })
     if (!patient) throw new NotFoundException('Пациент не найден')
     const org = await prisma.organization.findUniqueOrThrow({ where: { id: orgId } })
 
-    return generateCertificate({
+    const records = await loadRecords(patientId, orgId)
+    const buckets: Record<CertSectionKey, RecordWithRefs[]> = {
+      reaction: [], bcg: [], diphtheria: [], tetanus: [],
+      measles: [], mumps: [], rubella: [], hepb: [],
+    }
+    for (const r of records) {
+      const k = certSectionOf(r)
+      if (k) buckets[k].push(r)
+    }
+
+    const sections: CertificateSection[] = []
+    for (const key of CERT_SECTION_ORDER) {
+      const rows = buckets[key]
+      if (rows.length === 0) continue // пустые секции не показываем
+      sections.push(buildCertSection(key, rows))
+    }
+
+    return {
       fullName: `${patient.lastName} ${patient.firstName} ${patient.middleName ?? ''}`.trim(),
       birthday: ru(patient.birthday),
-      policyNumber: `${patient.policySerial ?? ''} ${patient.policyNumber ?? ''}`.trim(),
+      city: patient.cityName ? `Город ${patient.cityName}` : '',
+      issuedAt: ru(new Date()),
       lpuName: org.name,
-      vaccinations: patient.vaccinationRecords.map((r) => ({
-        name: r.vaccineSchedule?.name ?? r.vaccine?.name ?? '',
-        date: ru(r.vaccinationDate),
-        series: r.series ?? '',
-        dose: r.doseNumber?.toString() ?? '',
-        nextDate: r.nextScheduledDate ? ru(r.nextScheduledDate) : '',
-      })),
-    })
+      sections,
+    }
+  }
+}
+
+/* ——— Секции сертификата ——— */
+
+type CertSectionKey =
+  | 'reaction' | 'bcg' | 'diphtheria' | 'tetanus'
+  | 'measles' | 'mumps' | 'rubella' | 'hepb'
+
+const CERT_SECTION_ORDER: CertSectionKey[] = [
+  'reaction', 'bcg', 'diphtheria', 'tetanus',
+  'measles', 'mumps', 'rubella', 'hepb',
+]
+
+const CERT_SECTION_TITLE: Record<CertSectionKey, string> = {
+  reaction: 'Реакция Манту',
+  bcg: 'Туберкулёз',
+  diphtheria: 'Дифтерия',
+  tetanus: 'Столбняк',
+  measles: 'Корь',
+  mumps: 'Паротит',
+  rubella: 'Краснуха',
+  hepb: 'Вирусный гепатит В',
+}
+
+// «Корь» в parent.name мы матчим целиком, чтобы не зацепить «Краснуха».
+function certSectionOf(r: RecordWithRefs): CertSectionKey | null {
+  const parent = (r.vaccineSchedule?.parent?.name ?? r.vaccineSchedule?.name ?? '').toLowerCase()
+  const own = (r.vaccineSchedule?.name ?? '').toLowerCase()
+  if (/манту|диаскин|проб/.test(own) || /манту|диаскин/.test(parent)) return 'reaction'
+  if (/туберкул/.test(parent)) return 'bcg'
+  if (/дифтер/.test(parent)) return 'diphtheria'
+  if (/столбняк/.test(parent)) return 'tetanus'
+  if (/^корь$|^кор[еия]/.test(parent)) return 'measles'
+  if (/паротит/.test(parent)) return 'mumps'
+  if (/краснух/.test(parent)) return 'rubella'
+  if (/гепатит\s*[вb]/.test(parent)) return 'hepb'
+  return null
+}
+
+function doseStr(r: RecordWithRefs): string {
+  if (r.doseNumber != null) return String(r.doseNumber)
+  if (r.doseVolumeMl != null) return String(r.doseVolumeMl)
+  return ''
+}
+
+function buildCertSection(key: CertSectionKey, rows: RecordWithRefs[]): CertificateSection {
+  const title = CERT_SECTION_TITLE[key]
+
+  if (key === 'reaction') {
+    // Манту/Диаскинтест — у пробы своя структура колонок.
+    return {
+      title,
+      columns: ['Наименование', 'Разведение', 'Возраст', 'Дата', 'Доза', 'Серия', 'Рез-т'],
+      rows: rows.map((r) => [
+        r.vaccineSchedule?.name ?? '',
+        r.vaccine?.name ?? '',
+        ageLabel(r),
+        ru(r.vaccinationDate),
+        doseStr(r),
+        r.series ?? '',
+        r.result ?? '',
+      ]),
+    }
+  }
+
+  if (key === 'bcg') {
+    // У БЦЖ есть колонка «Рез-т».
+    return {
+      title,
+      columns: ['Кратность прививки', 'Наименование препарата', 'Возраст', 'Дата', 'Доза', 'Серия', 'Рез-т'],
+      rows: rows.map((r) => [
+        r.vaccineSchedule?.name ?? '',
+        r.vaccine?.name ?? '',
+        ageLabel(r),
+        ru(r.vaccinationDate),
+        doseStr(r),
+        r.series ?? '',
+        r.result ?? '',
+      ]),
+    }
+  }
+
+  // Все остальные секции — без колонки результата.
+  return {
+    title,
+    columns: ['Кратность прививки', 'Наименование препарата', 'Возраст', 'Дата', 'Доза', 'Серия'],
+    rows: rows.map((r) => [
+      r.vaccineSchedule?.name ?? '',
+      r.vaccine?.name ?? '',
+      ageLabel(r),
+      ru(r.vaccinationDate),
+      doseStr(r),
+      r.series ?? '',
+    ]),
   }
 }

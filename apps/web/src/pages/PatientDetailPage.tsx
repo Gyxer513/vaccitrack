@@ -173,10 +173,9 @@ export function PatientDetailPage() {
             063/у ↓
           </a>
           <a
-            href={`/api/v1/documents/patients/${id}/certificate`}
-            target="_blank"
-            rel="noreferrer"
+            href={`/api/v1/documents/patients/${id}/certificate.docx`}
             className="vt-btn vt-btn-ghost"
+            title="Скачать сертификат прививок (Word, выдаётся пациенту)"
           >
             Сертификат ↓
           </a>

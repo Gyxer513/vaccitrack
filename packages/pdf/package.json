@@ -8,6 +8,7 @@
     "pdfkit": "^0.15.0"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/pdfkit": "^0.13.0"
   }
 }

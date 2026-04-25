@@ -54,16 +54,24 @@ export type Form063Data = {
   other: Form063OtherRow[]
 }
 
+/**
+ * Сертификат о профилактических прививках — выдаётся пациенту.
+ * Структура повторяет шаблон Visual FoxPro: шапка ЛПУ + блок ФИО + секции по
+ * нозологиям, у каждой своя мини-таблица. Колонки секций различаются (у Манту
+ * есть «Разведение» и «Рез-т», у БЦЖ — «Рез-т», у остальных — без), поэтому
+ * таблица описывается обобщённо: массив колонок-заголовков и массив строк.
+ */
+export type CertificateSection = {
+  title: string         // «Реакция Манту», «Туберкулёз», «Дифтерия» и т.п.
+  columns: string[]     // Заголовки колонок (5–7 штук в зависимости от секции)
+  rows: string[][]      // Каждый ряд — массив значений строго по длине columns
+}
+
 export type CertificateData = {
-  fullName: string
-  birthday: string
-  policyNumber: string
-  lpuName: string
-  vaccinations: {
-    name: string
-    date: string
-    series: string
-    dose: string
-    nextDate: string
-  }[]
+  fullName: string      // ФИО полностью
+  birthday: string      // 11.10.2016
+  city: string          // «Город Москва»
+  issuedAt: string      // дата формирования (20.04.2026)
+  lpuName: string       // полное название ЛПУ + (отделение)
+  sections: CertificateSection[]
 }

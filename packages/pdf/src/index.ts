@@ -1,6 +1,6 @@
 export { generateForm063u } from './templates/form063u'
 export { generateForm063uDocx } from './templates/form063u-docx'
-export { generateCertificate } from './templates/certificate'
+export { generateCertificateDocx } from './templates/certificate-docx'
 export type {
   Form063Data,
   Form063Row,
@@ -8,4 +8,5 @@ export type {
   TubeTestRow,
   VacRevSplit,
   CertificateData,
+  CertificateSection,
 } from './types'

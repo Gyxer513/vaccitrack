@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { trpc } from '../lib/trpc'
 import { format } from 'date-fns'
 import { Pagination } from '../components/ui/Pagination'
+import { useDepartment } from '../components/DepartmentProvider'
 
 function ageLabel(birthday: Date | string) {
   const bd = new Date(birthday)
@@ -14,6 +15,7 @@ function ageLabel(birthday: Date | string) {
 }
 
 export function PatientsPage() {
+  const { dept } = useDepartment()
   const [search, setSearch] = useState('')
   const [districtId, setDistrictId] = useState<string | undefined>()
   const [page, setPage] = useState(1)
@@ -86,6 +88,15 @@ export function PatientsPage() {
                           <Link to={`/patients/${p.id}`} className="vt-link">
                             {p.lastName} {p.firstName} {p.middleName ?? ''}
                           </Link>
+                          {dept === 'KID' && p.isSelfOrganized && (
+                            <span
+                              className="vt-hint"
+                              style={{ marginLeft: 6 }}
+                              title="Самоорганизованный (прививается в саду / школе)"
+                            >
+                              (сам.)
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="vt-muted">

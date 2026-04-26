@@ -19,15 +19,17 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
-          <DepartmentProvider>
-            <BrowserRouter>
+          <BrowserRouter>
+            {/* DepartmentProvider внутри BrowserRouter — нужен useNavigate
+                для редиректа на /patients при смене отделения. */}
+            <DepartmentProvider>
               <ToastProvider>
                 <ConfirmProvider>
                   <App />
                 </ConfirmProvider>
               </ToastProvider>
-            </BrowserRouter>
-          </DepartmentProvider>
+            </DepartmentProvider>
+          </BrowserRouter>
         </QueryClientProvider>
       </trpc.Provider>
     </ErrorBoundary>

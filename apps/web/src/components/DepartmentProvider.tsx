@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import {
   type Dept,
   applyDeptToDom,
@@ -28,6 +29,7 @@ const DepartmentContext = createContext<DepartmentContextValue | null>(null)
  */
 export function DepartmentProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [dept, setDeptState] = useState<Dept>(() => readDeptFromStorage())
 
   // На маунте подтягиваем тему к html — на случай, если в localStorage уже
@@ -45,8 +47,13 @@ export function DepartmentProvider({ children }: { children: React.ReactNode }) 
       // Сбрасываем все кэши react-query — следующий refetch пойдёт уже с
       // новым x-dept хедером и вернёт пациентов/нозологии другого отделения.
       queryClient.invalidateQueries()
+      // Редирект на /patients: если юзер был на карточке конкретного пациента
+      // /patients/:id, то после смены dept этот пациент станет «не из нашего
+      // отделения» и getById вернёт not-found. Чтобы не показывать ошибку —
+      // выбрасываем на список, который сам перезапросится с новым dept.
+      navigate('/patients')
     },
-    [dept, queryClient],
+    [dept, queryClient, navigate],
   )
 
   const value = useMemo<DepartmentContextValue>(() => ({ dept, setDept }), [dept, setDept])

@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { trpc } from '../lib/trpc'
 import { format, differenceInMonths, differenceInYears } from 'date-fns'
+import { useDepartment } from '../components/DepartmentProvider'
 
 const STATUS_LABEL: Record<string, string> = {
   PLANNED: 'Запланировано',
@@ -120,6 +121,7 @@ const doctorShort = (d: RawRecord['doctor']) =>
 export function PatientDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { dept } = useDepartment()
   const { data: patient, isLoading } = trpc.patient.getById.useQuery({ id: id! })
 
   const injections = useMemo(
@@ -146,6 +148,11 @@ export function PatientDetailPage() {
             {' · '}{formatAge(patient.birthday)}
             {' · '}{patient.sex === 'MALE' ? 'Муж.' : 'Жен.'}
             {' · '}Участок: {patient.district?.code ?? '—'}
+            {dept === 'KID' && patient.isSelfOrganized && (
+              <span className="vt-badge vt-badge-accent" style={{ marginLeft: 8 }}>
+                Самоорганизованный
+              </span>
+            )}
           </p>
           {patient.activeMedExemption && (
             <div style={{ marginTop: 8 }}>
@@ -164,6 +171,12 @@ export function PatientDetailPage() {
             className="vt-btn vt-btn-primary"
           >
             Записать прививку
+          </button>
+          <button
+            onClick={() => navigate(`/patients/${id}/edit`)}
+            className="vt-btn vt-btn-ghost"
+          >
+            Редактировать
           </button>
           <a
             href={`/api/v1/documents/patients/${id}/form063u.docx`}

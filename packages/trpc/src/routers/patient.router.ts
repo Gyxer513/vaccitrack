@@ -17,6 +17,7 @@ const patientCreateSchema = z.object({
   directContractNumber: z.string().optional(),
   riskGroupId: z.string().optional(),
   isDecret: z.boolean().default(false),
+  isSelfOrganized: z.boolean().default(false),
 })
 
 export const patientRouter = router({

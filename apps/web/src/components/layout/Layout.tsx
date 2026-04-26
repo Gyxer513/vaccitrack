@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { DepartmentSwitcher } from '../DepartmentSwitcher'
+import { IconSettings } from '../vaccination/icons'
 
 const nav = [
   { to: '/patients', label: 'Пациенты' },
@@ -29,6 +30,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </nav>
         <div className="vt-topbar-right">
           <DepartmentSwitcher />
+          <Link
+            to="/settings"
+            className={`vt-btn-icon${pathname.startsWith('/settings') ? ' active' : ''}`}
+            aria-label="Настройки"
+            title="Настройки"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textDecoration: 'none',
+            }}
+          >
+            <IconSettings size={18} />
+          </Link>
           <span className="vt-user">Администратор</span>
         </div>
       </header>

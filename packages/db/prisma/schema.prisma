@@ -229,10 +229,11 @@ model Patient {
   hasDirectContract    Boolean @default(false)
   directContractNumber String?
 
-  isResident Boolean @default(true)
-  isAlive    Boolean @default(true)
-  isDecret   Boolean @default(false)
-  isGkdc     Boolean @default(false)
+  isResident      Boolean @default(true)
+  isAlive         Boolean @default(true)
+  isDecret        Boolean @default(false)
+  isGkdc          Boolean @default(false)
+  isSelfOrganized Boolean @default(false)
 
   activeMedExemptionId String?
   activeMedExemption   PatientMedExemption? @relation("ActiveExemption", fields: [activeMedExemptionId], references: [id])

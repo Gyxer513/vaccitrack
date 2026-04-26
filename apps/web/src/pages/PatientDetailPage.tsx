@@ -1,7 +1,8 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { trpc } from '../lib/trpc'
 import { format, differenceInMonths, differenceInYears } from 'date-fns'
+import { MedExemptionDialog } from '../components/patient/MedExemptionDialog'
 import { useDepartment } from '../components/DepartmentProvider'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -123,6 +124,7 @@ export function PatientDetailPage() {
   const navigate = useNavigate()
   const { dept } = useDepartment()
   const { data: patient, isLoading } = trpc.patient.getById.useQuery({ id: id! })
+  const [medExemptOpen, setMedExemptOpen] = useState(false)
 
   const injections = useMemo(
     () => (patient ? groupInjections(patient.vaccinationRecords as RawRecord[]) : []),
@@ -177,6 +179,12 @@ export function PatientDetailPage() {
             className="vt-btn vt-btn-ghost"
           >
             Редактировать
+          </button>
+          <button
+            onClick={() => setMedExemptOpen(true)}
+            className="vt-btn vt-btn-ghost"
+          >
+            Медотвод
           </button>
           <a
             href={`/api/v1/documents/patients/${id}/form063u.docx`}
@@ -288,6 +296,12 @@ export function PatientDetailPage() {
           </table>
         )}
       </div>
+
+      <MedExemptionDialog
+        patientId={id!}
+        open={medExemptOpen}
+        onClose={() => setMedExemptOpen(false)}
+      />
 
       {/* ПЛАН */}
       {patient.planItems.length > 0 && (

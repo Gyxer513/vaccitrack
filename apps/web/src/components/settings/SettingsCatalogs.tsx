@@ -378,21 +378,11 @@ export function SettingsCatalogs() {
                     <td>
                       <Link
                         to={c.id}
-                        className="vt-display"
-                        style={{
-                          fontWeight: 600,
-                          color: 'var(--vt-link, var(--vt-text))',
-                          textDecoration: 'none',
-                        }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.textDecoration = 'underline')
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.textDecoration = 'none')
-                        }
+                        className="vt-display vt-link-catalog"
                         title="Открыть позиции каталога"
                       >
                         {c.name}
+                        <span className="vt-link-catalog-arrow" aria-hidden="true">→</span>
                       </Link>
                       {c.approvalRef && (
                         <div className="vt-hint" style={{ marginTop: 2 }}>

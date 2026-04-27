@@ -602,6 +602,33 @@ html, body, #root {
   min-width: 0; /* чтобы таблицы не растягивали grid-колонку */
 }
 
+/* Ссылка-название каталога в списке: даём явный hover-state и стрелку,
+   чтобы было понятно — это кликабельный переход к деталям. */
+.vt-link-catalog {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--vt-text);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.vt-link-catalog:hover {
+  color: var(--vt-primary);
+}
+.vt-link-catalog:hover .vt-link-catalog-arrow {
+  transform: translateX(3px);
+  opacity: 1;
+}
+.vt-link-catalog-arrow {
+  font-family: var(--vt-font-body);
+  font-weight: 400;
+  font-size: 14px;
+  color: var(--vt-primary);
+  opacity: 0.55;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
 @media (max-width: 720px) {
   .vt-settings-layout {
     grid-template-columns: 1fr;

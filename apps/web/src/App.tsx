@@ -10,6 +10,7 @@ import { VaccinesPage } from './pages/VaccinesPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { SettingsDistricts } from './components/settings/SettingsDistricts'
 import { SettingsCatalogs } from './components/settings/SettingsCatalogs'
+import { SettingsCatalogDetail } from './components/settings/SettingsCatalogDetail'
 import { ErrorPage } from './pages/ErrorPage'
 
 export default function App() {
@@ -33,6 +34,7 @@ export default function App() {
               <Route index element={<Navigate to="districts" replace />} />
               <Route path="districts" element={<SettingsDistricts />} />
               <Route path="catalogs" element={<SettingsCatalogs />} />
+              <Route path="catalogs/:catalogId" element={<SettingsCatalogDetail />} />
             </Route>
             {/* Неизвестный маршрут */}
             <Route

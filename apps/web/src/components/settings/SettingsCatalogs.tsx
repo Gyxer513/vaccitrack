@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { useConfirm, useToast } from '../ui/Dialog'
 import { useDepartment } from '../DepartmentProvider'
@@ -375,9 +376,24 @@ export function SettingsCatalogs() {
                 return (
                   <tr key={c.id}>
                     <td>
-                      <span className="vt-display" style={{ fontWeight: 600 }}>
+                      <Link
+                        to={c.id}
+                        className="vt-display"
+                        style={{
+                          fontWeight: 600,
+                          color: 'var(--vt-link, var(--vt-text))',
+                          textDecoration: 'none',
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.textDecoration = 'underline')
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.textDecoration = 'none')
+                        }
+                        title="Открыть позиции каталога"
+                      >
                         {c.name}
-                      </span>
+                      </Link>
                       {c.approvalRef && (
                         <div className="vt-hint" style={{ marginTop: 2 }}>
                           {c.approvalRef}

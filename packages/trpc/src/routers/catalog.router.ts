@@ -46,6 +46,13 @@ export const catalogRouter = router({
         include: {
           parentCatalog: true,
           childCatalogs: { select: { id: true, name: true, region: true } },
+          // Какие сайты юзера выбрали этот каталог как активный — нужно
+          // детальной странице, чтобы показать бейдж/кнопку «Сделать
+          // активным» (как в списке).
+          activeForSites: {
+            where: { organizationId: ctx.user.orgId, dept: ctx.dept },
+            select: { id: true, name: true },
+          },
           schedules: {
             include: { parent: { select: { id: true, name: true } } },
             orderBy: [{ parentId: 'asc' }, { code: 'asc' }],

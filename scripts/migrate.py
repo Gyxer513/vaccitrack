@@ -492,7 +492,11 @@ def migrate(dbf_dir: str, dsn: str, dept: str):
                 ss(row.get('NDOMA')), ss(row.get('NKV')), ss(row.get('PHONE')),
                 ss(row.get('POLIS_S')), ss(row.get('POLIS_N')),
                 False, None,                                  # hasDirectContract / directContractNumber
-                bool(row.get('RESIDENT', True)), bool(row.get('LIVE', True)),
+                bool(row.get('RESIDENT', True)),
+                # Поле LIVE надёжно работает только в детской базе. Во взрослой
+                # оно везде False — там «активность» считается по DT_END:
+                # есть дата выписки → снят с учёта.
+                row.get('DT_END') is None,                    # isAlive
                 bool(row.get('DEKRET', False)), bool(row.get('GKDC', False)),
                 False,                                        # isSelfOrganized — заполняется вручную
             ))

@@ -21,7 +21,89 @@ export function SettingsPage() {
       </div>
 
       <DistrictsSection />
+      <div style={{ height: 32 }} />
+      <CatalogsSection />
     </div>
+  )
+}
+
+/* ————— Раздел «Календари прививок» (read-only в Phase 1) ————— */
+
+function CatalogsSection() {
+  const { dept } = useDepartment()
+  const catalogsQ = trpc.catalog.list.useQuery()
+  const catalogs = catalogsQ.data ?? []
+
+  return (
+    <section>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 }}>
+        <h2 className="vt-section-title" style={{ margin: 0 }}>
+          Календари прививок · {DEPT_LABELS[dept]}
+        </h2>
+        <span className="vt-hint">Создание и редактирование — следующая фаза</span>
+      </div>
+
+      <div className="vt-card" style={{ overflow: 'hidden' }}>
+        {catalogsQ.isLoading ? (
+          <div className="vt-loading">Загрузка…</div>
+        ) : catalogs.length === 0 ? (
+          <div className="vt-empty" style={{ padding: '40px 24px' }}>
+            Каталоги для отделения «{DEPT_LABELS[dept]}» ещё не заведены.
+            <div className="vt-hint" style={{ marginTop: 8 }}>
+              Существующие позиции прививок будут привязаны к каталогу
+              после сидера приказа МЗ № 1122н в следующей фазе.
+            </div>
+          </div>
+        ) : (
+          <table className="vt-table">
+            <thead>
+              <tr>
+                <th>Название</th>
+                <th>Регион</th>
+                <th>Расширяет</th>
+                <th>Позиций</th>
+                <th>Утверждён</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {catalogs.map((c) => (
+                <tr key={c.id}>
+                  <td>
+                    <span className="vt-display" style={{ fontWeight: 600 }}>{c.name}</span>
+                    {c.approvalRef && (
+                      <div className="vt-hint" style={{ marginTop: 2 }}>{c.approvalRef}</div>
+                    )}
+                  </td>
+                  <td className="vt-mono">{c.region}</td>
+                  <td>
+                    {c.parentCatalog ? (
+                      <span className="vt-hint">{c.parentCatalog.name}</span>
+                    ) : (
+                      <span className="vt-hint">—</span>
+                    )}
+                  </td>
+                  <td className="vt-mono">{c._count.schedules}</td>
+                  <td className="vt-hint">
+                    {c.validFrom ? new Date(c.validFrom).toLocaleDateString('ru-RU') : '—'}
+                  </td>
+                  <td>
+                    {c.isActive ? (
+                      <span className="vt-badge vt-badge-accent">активен</span>
+                    ) : (
+                      <span className="vt-badge vt-badge-neutral">архив</span>
+                    )}
+                    {c.isLegacy && (
+                      <span className="vt-badge vt-badge-neutral" style={{ marginLeft: 6 }}>legacy</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </section>
   )
 }
 

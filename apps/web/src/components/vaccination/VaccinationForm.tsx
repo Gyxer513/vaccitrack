@@ -26,7 +26,7 @@ import {
 } from './schedule-display'
 
 type Mode = 'vaccination' | 'exemption'
-type StatusFilter = 'all' | 'overdue' | 'due-soon' | 'planned' | 'never'
+type StatusFilter = 'all' | 'overdue' | 'due-soon' | 'planned' | 'never' | 'exempt'
 
 // Локальная дата (YYYY-MM-DD) без TZ-конверсии. toISOString даёт UTC и после 21:00 по МСК
 // возвращает завтрашнюю дату — это ломало max={today()} и парсинг при submit.
@@ -164,7 +164,12 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
   const enrichedSchedules = useMemo(() => {
     if (!schedules || !patient) return []
     return schedules.map((s) => {
-      const status = getScheduleStatus(s, patient.birthday, patient.vaccinationRecords)
+      const status = getScheduleStatus(
+        s,
+        patient.birthday,
+        patient.vaccinationRecords,
+        patient.activeMedExemption,
+      )
       const last = getLastDose(s.id, patient.vaccinationRecords)
       const disp = getScheduleDisplay(s)
       return { schedule: s, status, lastDose: last, display: disp }
@@ -173,12 +178,13 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
 
   // Счётчики для табов
   const statusCounts = useMemo(() => {
-    const c = { all: enrichedSchedules.length, overdue: 0, 'due-soon': 0, planned: 0, never: 0 }
+    const c = { all: enrichedSchedules.length, overdue: 0, 'due-soon': 0, planned: 0, never: 0, exempt: 0 }
     for (const e of enrichedSchedules) {
       if (e.status === 'overdue') c.overdue++
       else if (e.status === 'due-soon') c['due-soon']++
       else if (e.status === 'planned') c.planned++
       else if (e.status === 'never') c.never++
+      else if (e.status === 'exempt') c.exempt++
     }
     return c
   }, [enrichedSchedules])
@@ -438,6 +444,7 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
                       { k: 'due-soon', label: 'Скоро', count: statusCounts['due-soon'], tone: 'amber' },
                       { k: 'planned', label: 'В плане', count: statusCounts.planned, tone: 'accent' },
                       { k: 'never', label: 'Не делали', count: statusCounts.never, tone: 'violet' },
+                      { k: 'exempt', label: 'Медотвод', count: statusCounts.exempt, tone: 'amber' },
                     ] as const
                   ).map((t) => (
                     <button

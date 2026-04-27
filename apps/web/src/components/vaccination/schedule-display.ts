@@ -60,6 +60,10 @@ type ScheduleAgeInfo = {
 
 type RecordLike = { vaccineScheduleId: string | null; vaccinationDate: Date | string }
 
+// Активный медотвод пациента — общий на все позиции календаря.
+// dateTo === null → бессрочный, иначе действует пока now <= dateTo.
+type ActiveExemption = { dateTo: Date | string | null } | null | undefined
+
 // Грубая конвертация возраста в дни. Для задачи «пора ли» точности хватает.
 function ageToDays(years: number, months: number, days: number): number {
   return Math.round(years * 365.25) + Math.round(months * 30.5) + days
@@ -71,6 +75,12 @@ function daysBetween(from: Date | string, to: Date | string): number {
   )
 }
 
+function isExemptionActive(exemption: ActiveExemption): boolean {
+  if (!exemption) return false
+  if (exemption.dateTo === null || exemption.dateTo === undefined) return true // бессрочный
+  return new Date(exemption.dateTo).getTime() >= Date.now()
+}
+
 // Окно «скоро»: за сколько дней ДО минимального возраста считать прививку как due-soon.
 const DUE_SOON_WINDOW_DAYS = 30
 
@@ -78,9 +88,22 @@ export function getScheduleStatus(
   schedule: ScheduleAgeInfo,
   birthday: Date | string,
   records: RecordLike[] | undefined,
+  activeExemption?: ActiveExemption,
 ): ScheduleStatus {
   // 1. Уже сделана?
   if (records?.some((r) => r.vaccineScheduleId === schedule.id)) return 'done'
+
+  // 2. Активный медотвод — пациент защищён от планов до окончания отвода.
+  // В нашей модели медотвод общий на пациента (PatientMedExemption без
+  // привязки к конкретной нозологии), поэтому блокирует все позиции
+  // календаря, до которых пациент дошёл по возрасту.
+  if (isExemptionActive(activeExemption)) {
+    const ageDays = daysBetween(birthday, new Date())
+    const minDays = ageToDays(schedule.minAgeYears, schedule.minAgeMonths, schedule.minAgeDays)
+    // exempt только для тех позиций, до которых пациент уже дорос. Будущие —
+    // оставляем 'planned' (когда отвод закончится, посмотрим заново).
+    if (ageDays >= minDays) return 'exempt'
+  }
 
   const ageDays = daysBetween(birthday, new Date())
   const minDays = ageToDays(schedule.minAgeYears, schedule.minAgeMonths, schedule.minAgeDays)

@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { prisma } from '@vaccitrack/db'
-import { generateForm063u, generateForm063uDocx, generateCertificateDocx } from '@vaccitrack/pdf'
-import type { Form063Data, CertificateData, CertificateSection } from '@vaccitrack/pdf'
+import { generateForm063u, generateForm063uDocx, generateCertificateDocx, generatePlanDocx } from '@vaccitrack/pdf'
+import type { Form063Data, CertificateData, CertificateSection, PlanData, PlanRow, PlanGroupKey } from '@vaccitrack/pdf'
 import type { Form063Row, Form063OtherRow, VacRevSplit } from '@vaccitrack/pdf'
+import { buildPlanForPatient, filterReportableItems } from '@vaccitrack/trpc'
 
 type RecordWithRefs = Awaited<ReturnType<typeof loadRecords>>[number]
 
@@ -47,6 +48,10 @@ function ageLabel(r: RecordWithRefs): string {
 
 function ru(d: Date): string {
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+function formatDdMm(d: Date): string {
+  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })
 }
 
 function toRow(r: RecordWithRefs): Form063Row {
@@ -157,6 +162,76 @@ export class DocumentsService {
 
   async certificateDocx(patientId: string, orgId: string): Promise<Buffer> {
     return generateCertificateDocx(await this.buildCertificateData(patientId, orgId))
+  }
+
+  async planDocx(districtId: string, from: string, to: string, orgId: string): Promise<Buffer> {
+    const fromDate = new Date(from)
+    const toDate = new Date(to)
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+      throw new NotFoundException('Некорректные даты периода')
+    }
+
+    const district = await prisma.district.findFirst({
+      where: { id: districtId, site: { organizationId: orgId } },
+      include: { site: { include: { activeCatalog: true } } },
+    })
+    if (!district) throw new NotFoundException('Участок не найден')
+
+    const org = await prisma.organization.findUniqueOrThrow({ where: { id: orgId } })
+
+    const patients = await prisma.patient.findMany({
+      where: { organizationId: orgId, districtId, isAlive: true },
+      include: {
+        vaccinationRecords: true,
+        activeMedExemption: true,
+        district: { include: { site: true } },
+      },
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+    })
+
+    const rows: PlanRow[] = []
+    for (const p of patients) {
+      const all = await buildPlanForPatient(prisma, p)
+      const filtered = filterReportableItems(all, fromDate, toDate)
+      if (filtered.length === 0) continue
+
+      // Сворачиваем позиции в ячейки по группам. Если в одной группе несколько
+      // позиций — стэкаем «V1 21.04 / V2 28.05» через перевод строки.
+      const cells: Partial<Record<PlanGroupKey, string>> = {}
+      for (const item of filtered) {
+        const dueDdMm = formatDdMm(item.dueDate)
+        const piece = `${item.shortCode} ${dueDdMm}`
+        const key = item.group as PlanGroupKey
+        cells[key] = cells[key] ? `${cells[key]}\n${piece}` : piece
+      }
+      rows.push({
+        patientFio: `${p.lastName} ${p.firstName} ${p.middleName ?? ''}`.trim(),
+        birthday: ru(p.birthday),
+        cells,
+      })
+    }
+
+    // Резолв имени каталога для шапки.
+    let catalogName = '—'
+    if (district.site?.activeCatalog) {
+      catalogName = district.site.activeCatalog.name
+    } else {
+      const fallback = await prisma.catalog.findFirst({
+        where: { region: 'RU', scope: district.site?.dept ?? 'KID', isActive: true },
+        select: { name: true },
+      })
+      if (fallback) catalogName = fallback.name
+    }
+
+    const data: PlanData = {
+      lpuName: org.name,
+      catalogName,
+      district: district.code,
+      fromDate: ru(fromDate),
+      toDate: ru(toDate),
+      rows,
+    }
+    return generatePlanDocx(data)
   }
 
   private async buildCertificateData(patientId: string, orgId: string): Promise<CertificateData> {

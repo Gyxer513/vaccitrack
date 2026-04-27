@@ -1,4 +1,4 @@
-import { Controller, Get, Inject, Param, Res, Req } from '@nestjs/common'
+import { Controller, Get, Inject, Param, Query, Res, Req } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger'
 import { DocumentsService } from './documents.service'
 import type { Request, Response } from 'express'
@@ -55,6 +55,21 @@ export class DocumentsController {
     const buffer = await this.svc.certificateDocx(id, resolveOrgId(req))
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     res.setHeader('Content-Disposition', `attachment; filename="certificate_${id}.docx"`)
+    res.send(buffer)
+  }
+
+  @Get('plan.docx')
+  @ApiOperation({ summary: 'Скачать план прививок по участку (Word)' })
+  async planDocx(
+    @Query('districtId') districtId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.svc.planDocx(districtId, from, to, resolveOrgId(req))
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    res.setHeader('Content-Disposition', `attachment; filename="plan_${districtId}_${from}_${to}.docx"`)
     res.send(buffer)
   }
 }

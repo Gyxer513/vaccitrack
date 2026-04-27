@@ -563,6 +563,63 @@ html, body, #root {
 .vt-row { display: flex; gap: 12px; align-items: center; }
 .vt-spacer { flex: 1; }
 
+/* ————— Settings: sidebar layout ————— */
+.vt-settings-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+.vt-settings-sidebar {
+  border-right: 1px solid var(--vt-border);
+  padding-right: 16px;
+  display: flex;
+  flex-direction: column;
+}
+.vt-settings-sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.vt-settings-nav-item {
+  display: block;
+  padding: 10px 14px;
+  border-radius: 8px;
+  color: var(--vt-text);
+  text-decoration: none;
+  font-size: 14px;
+  transition: background .12s, color .12s;
+}
+.vt-settings-nav-item:hover {
+  background: var(--vt-bg-warm);
+}
+.vt-settings-nav-item.active {
+  background: var(--vt-accent-bg);
+  color: var(--vt-accent-text);
+  font-weight: 500;
+}
+.vt-settings-content {
+  min-width: 0; /* чтобы таблицы не растягивали grid-колонку */
+}
+
+@media (max-width: 720px) {
+  .vt-settings-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .vt-settings-sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--vt-border);
+    padding-right: 0;
+    padding-bottom: 12px;
+  }
+  .vt-settings-sidebar nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}
+
 /* ————— Анимации для модалок и тостов ————— */
 @keyframes vt-fade-in {
   from { opacity: 0; }

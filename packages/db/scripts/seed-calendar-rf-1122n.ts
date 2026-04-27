@@ -15,30 +15,19 @@
  * NB: Legacy schedules с catalogId=NULL (импорт из FoxPro) не трогаем.
  */
 
-import { PrismaClient, Prisma } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
+import {
+  upsertCatalog,
+  replaceSchedules,
+  type ScheduleSeed,
+} from './seed-calendar-helpers'
 
 const prisma = new PrismaClient()
 
 const APPROVAL_REF = 'Приказ МЗ РФ № 1122н от 06.12.2021'
 const VALID_FROM = new Date('2022-01-01T00:00:00.000Z')
 const REGION = 'RU'
-
-type ScheduleSeed = {
-  code: string
-  name: string
-  shortName?: string
-  minAgeYears?: number
-  minAgeMonths?: number
-  minAgeDays?: number
-  maxAgeYears?: number
-  maxAgeMonths?: number
-  maxAgeDays?: number
-  isEpid?: boolean
-  isEpidContact?: boolean
-  isCatchUp?: boolean
-  catchUpMaxAgeYears?: number
-  appliesToSex?: 'MALE' | 'FEMALE'
-}
+const LOG_TAG = '[1122n]'
 
 // ============================================================================
 // Приложение 1 — плановый календарь (KID)
@@ -441,108 +430,33 @@ const ADULT_EPID_SCHEDULES: ScheduleSeed[] = [
 const KID_SCHEDULES: ScheduleSeed[] = [...KID_PLAN_SCHEDULES, ...KID_EPID_SCHEDULES]
 const ADULT_SCHEDULES: ScheduleSeed[] = [...ADULT_PLAN_SCHEDULES, ...ADULT_EPID_SCHEDULES]
 
-// ============================================================================
-// Идемпотентный upsert каталога по (region, scope, approvalRef)
-// ============================================================================
-async function upsertCatalog(
-  tx: Prisma.TransactionClient,
-  params: { name: string; scope: 'KID' | 'ADULT' },
-) {
-  const existing = await tx.catalog.findFirst({
-    where: {
-      region: REGION,
-      scope: params.scope,
-      approvalRef: APPROVAL_REF,
-    },
-  })
-
-  if (existing) {
-    console.log(`[1122n] каталог ${params.scope} уже существует (id=${existing.id}), обновляю`)
-    return tx.catalog.update({
-      where: { id: existing.id },
-      data: {
-        name: params.name,
-        validFrom: VALID_FROM,
-        isActive: true,
-        isLegacy: false,
-      },
-    })
-  }
-
-  console.log(`[1122n] создаю каталог ${params.scope}: ${params.name}`)
-  return tx.catalog.create({
-    data: {
-      name: params.name,
-      region: REGION,
-      scope: params.scope,
-      approvalRef: APPROVAL_REF,
-      validFrom: VALID_FROM,
-      isActive: true,
-      isLegacy: false,
-    },
-  })
-}
-
-// ============================================================================
-// Сначала удаляем VaccineScheduleLink (FK-зависимость), потом сами schedules,
-// затем заново создаём все позиции
-// ============================================================================
-async function replaceSchedules(
-  tx: Prisma.TransactionClient,
-  catalogId: string,
-  seeds: ScheduleSeed[],
-) {
-  await tx.vaccineScheduleLink.deleteMany({
-    where: { vaccineSchedule: { catalogId } },
-  })
-  const deleted = await tx.vaccineSchedule.deleteMany({ where: { catalogId } })
-  if (deleted.count > 0) {
-    console.log(`[1122n] catalogId=${catalogId}: удалено ${deleted.count} старых позиций`)
-  }
-
-  for (const s of seeds) {
-    await tx.vaccineSchedule.create({
-      data: {
-        code: s.code,
-        name: s.name,
-        shortName: s.shortName ?? null,
-        catalogId,
-        isActive: true,
-        isEpid: s.isEpid ?? false,
-        isEpidContact: s.isEpidContact ?? false,
-        isCatchUp: s.isCatchUp ?? false,
-        catchUpMaxAgeYears: s.catchUpMaxAgeYears ?? null,
-        appliesToSex: s.appliesToSex ?? null,
-        minAgeYears: s.minAgeYears ?? 0,
-        minAgeMonths: s.minAgeMonths ?? 0,
-        minAgeDays: s.minAgeDays ?? 0,
-        maxAgeYears: s.maxAgeYears ?? 99,
-        maxAgeMonths: s.maxAgeMonths ?? 0,
-        maxAgeDays: s.maxAgeDays ?? 0,
-      },
-    })
-  }
-}
-
 async function main() {
-  console.log('[1122n] Старт сидера приказа МЗ РФ № 1122н')
+  console.log(`${LOG_TAG} Старт сидера приказа МЗ РФ № 1122н`)
 
   await prisma.$transaction(async (tx) => {
     const kidCatalog = await upsertCatalog(tx, {
       name: 'Национальный календарь РФ (детский)',
+      region: REGION,
       scope: 'KID',
+      approvalRef: APPROVAL_REF,
+      validFrom: VALID_FROM,
+      logTag: LOG_TAG,
     })
     const adultCatalog = await upsertCatalog(tx, {
       name: 'Национальный календарь РФ (взрослый)',
+      region: REGION,
       scope: 'ADULT',
+      approvalRef: APPROVAL_REF,
+      validFrom: VALID_FROM,
+      logTag: LOG_TAG,
     })
 
-    await replaceSchedules(tx, kidCatalog.id, KID_SCHEDULES)
-    await replaceSchedules(tx, adultCatalog.id, ADULT_SCHEDULES)
+    await replaceSchedules(tx, kidCatalog.id, KID_SCHEDULES, LOG_TAG)
+    await replaceSchedules(tx, adultCatalog.id, ADULT_SCHEDULES, LOG_TAG)
   })
 
   console.log(
-    `[1122n] Готово. KID=${KID_SCHEDULES.length} (план=${KID_PLAN_SCHEDULES.length}, эпид=${KID_EPID_SCHEDULES.length}), ` +
+    `${LOG_TAG} Готово. KID=${KID_SCHEDULES.length} (план=${KID_PLAN_SCHEDULES.length}, эпид=${KID_EPID_SCHEDULES.length}), ` +
       `ADULT=${ADULT_SCHEDULES.length} (план=${ADULT_PLAN_SCHEDULES.length}, эпид=${ADULT_EPID_SCHEDULES.length}).`,
   )
 }

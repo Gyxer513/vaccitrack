@@ -8,6 +8,7 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed:rf-1122n": "tsx scripts/seed-calendar-rf-1122n.ts",
+    "db:seed:msk-207": "tsx scripts/seed-calendar-msk-207.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

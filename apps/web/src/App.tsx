@@ -8,6 +8,8 @@ import { PlanPage } from './pages/PlanPage'
 import { NewVaccinationPage } from './pages/NewVaccinationPage'
 import { VaccinesPage } from './pages/VaccinesPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { SettingsDistricts } from './components/settings/SettingsDistricts'
+import { SettingsCatalogs } from './components/settings/SettingsCatalogs'
 import { ErrorPage } from './pages/ErrorPage'
 
 export default function App() {
@@ -27,7 +29,11 @@ export default function App() {
             <Route path="/patients/:id" element={<PatientDetailPage />} />
             <Route path="/plan" element={<PlanPage />} />
             <Route path="/vaccines" element={<VaccinesPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/settings" element={<SettingsPage />}>
+              <Route index element={<Navigate to="districts" replace />} />
+              <Route path="districts" element={<SettingsDistricts />} />
+              <Route path="catalogs" element={<SettingsCatalogs />} />
+            </Route>
             {/* Неизвестный маршрут */}
             <Route
               path="*"

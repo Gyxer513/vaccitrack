@@ -233,7 +233,7 @@ model Patient {
   isAlive         Boolean @default(true)
   isDecret        Boolean @default(false)
   isGkdc          Boolean @default(false)
-  isSelfOrganized Boolean @default(false)
+  isOrganized     Boolean @default(false)
 
   activeMedExemptionId String?
   activeMedExemption   PatientMedExemption? @relation("ActiveExemption", fields: [activeMedExemptionId], references: [id])

@@ -150,9 +150,9 @@ export function PatientDetailPage() {
             {' · '}{formatAge(patient.birthday)}
             {' · '}{patient.sex === 'MALE' ? 'Муж.' : 'Жен.'}
             {' · '}Участок: {patient.district?.code ?? '—'}
-            {dept === 'KID' && patient.isSelfOrganized && (
+            {dept === 'KID' && patient.isOrganized && (
               <span className="vt-badge vt-badge-accent" style={{ marginLeft: 8 }}>
-                Самоорганизованный
+                Организованный
               </span>
             )}
           </p>

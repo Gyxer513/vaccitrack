@@ -32,7 +32,7 @@ export function EditPatientPage() {
         hasDirectContract: patient.hasDirectContract,
         directContractNumber: patient.directContractNumber,
         isDecret: patient.isDecret,
-        isSelfOrganized: patient.isSelfOrganized,
+        isOrganized: patient.isOrganized,
       }}
     />
   )

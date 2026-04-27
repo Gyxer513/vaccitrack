@@ -22,7 +22,7 @@ type Form = {
   hasDirectContract: boolean
   directContractNumber: string
   isDecret: boolean
-  isSelfOrganized: boolean
+  isOrganized: boolean
 }
 
 const EMPTY: Form = {
@@ -40,7 +40,7 @@ const EMPTY: Form = {
   hasDirectContract: false,
   directContractNumber: '',
   isDecret: false,
-  isSelfOrganized: false,
+  isOrganized: false,
 }
 
 const todayLocal = () => {
@@ -71,7 +71,7 @@ export type PatientFormInitial = {
   hasDirectContract: boolean
   directContractNumber: string | null
   isDecret: boolean
-  isSelfOrganized: boolean
+  isOrganized: boolean
 }
 
 function fromInitial(p: PatientFormInitial): Form {
@@ -90,7 +90,7 @@ function fromInitial(p: PatientFormInitial): Form {
     hasDirectContract: p.hasDirectContract,
     directContractNumber: p.directContractNumber ?? '',
     isDecret: p.isDecret,
-    isSelfOrganized: p.isSelfOrganized,
+    isOrganized: p.isOrganized,
   }
 }
 
@@ -161,7 +161,7 @@ export function PatientForm(props: Props) {
       policySerial: f.hasDirectContract ? undefined : (f.policySerial.trim() || undefined),
       policyNumber: f.hasDirectContract ? undefined : (f.policyNumber.trim() || undefined),
       isDecret: f.isDecret,
-      isSelfOrganized: f.isSelfOrganized,
+      isOrganized: f.isOrganized,
     }
 
     if (mode === 'create') {
@@ -362,11 +362,11 @@ export function PatientForm(props: Props) {
           >
             <input
               type="checkbox"
-              checked={f.isSelfOrganized}
-              onChange={(e) => set('isSelfOrganized', e.target.checked)}
+              checked={f.isOrganized}
+              onChange={(e) => set('isOrganized', e.target.checked)}
             />
             <span>
-              Самоорганизованный{' '}
+              Организованный{' '}
               <span className="vt-hint">(прививается в саду / школе)</span>
             </span>
           </label>

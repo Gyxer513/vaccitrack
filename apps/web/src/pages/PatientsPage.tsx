@@ -92,7 +92,7 @@ export function PatientsPage() {
                             <span
                               className="vt-hint"
                               style={{ marginLeft: 6 }}
-                              title="Организованный (прививается в саду / школе)"
+                              title="Организованные (прививается в саду / школе)"
                             >
                               (орг.)
                             </span>

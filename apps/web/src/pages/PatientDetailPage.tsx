@@ -152,7 +152,7 @@ export function PatientDetailPage() {
             {' · '}Участок: {patient.district?.code ?? '—'}
             {dept === 'KID' && patient.isOrganized && (
               <span className="vt-badge vt-badge-accent" style={{ marginLeft: 8 }}>
-                Организованный
+                Организованные
               </span>
             )}
           </p>

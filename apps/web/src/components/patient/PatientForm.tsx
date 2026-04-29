@@ -366,7 +366,7 @@ export function PatientForm(props: Props) {
               onChange={(e) => set('isOrganized', e.target.checked)}
             />
             <span>
-              Организованный{' '}
+              Организованные{' '}
               <span className="vt-hint">(прививается в саду / школе)</span>
             </span>
           </label>

@@ -7,17 +7,19 @@ const ISO = (d: Date): string => d.toISOString().slice(0, 10)
 export function PlanPage() {
   const today = useMemo(() => new Date(), [])
   const [districtId, setDistrictId] = useState('')
+  const [catalogId, setCatalogId] = useState('')
   const [from, setFrom] = useState(ISO(today))
   const [to, setTo] = useState(ISO(addDays(today, 30)))
 
   const { data: districts } = trpc.reference.districts.useQuery()
+  const { data: catalogs } = trpc.catalog.list.useQuery()
   const { data: rows, isLoading } = trpc.plan.byDistrict.useQuery(
-    { districtId, fromDate: new Date(from), toDate: new Date(to) },
+    { districtId, catalogId: catalogId || null, fromDate: new Date(from), toDate: new Date(to) },
     { enabled: !!districtId && !!from && !!to },
   )
 
   const downloadHref = districtId
-    ? `/api/v1/documents/plan.docx?districtId=${encodeURIComponent(districtId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+    ? `/api/v1/documents/plan.docx?districtId=${encodeURIComponent(districtId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${catalogId ? `&catalogId=${encodeURIComponent(catalogId)}` : ''}`
     : '#'
 
   const districtLabel = districts?.find((d) => d.id === districtId)
@@ -38,6 +40,19 @@ export function PlanPage() {
             <option value="">Выберите участок</option>
             {districts?.map((d) => (
               <option key={d.id} value={d.id}>{d.code} — {d.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Календарь</label>
+          <select
+            value={catalogId}
+            onChange={(e) => setCatalogId(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-2 text-sm min-w-[280px]"
+          >
+            <option value="">Активный календарь отделения</option>
+            {catalogs?.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
         </div>
@@ -118,7 +133,7 @@ export function PlanPage() {
                                 ? 'bg-amber-50 text-amber-700 border border-amber-200'
                                 : 'bg-blue-50 text-blue-700 border border-blue-200'
                             }`}
-                            title={`${it.scheduleName} • ${it.status}`}
+                            title={`${it.scheduleName} • ${format(new Date(it.dueDate), 'dd.MM.yyyy')} • ${it.status}`}
                           >
                             <span className="font-medium">{it.shortCode}</span>
                             <span className="opacity-70">

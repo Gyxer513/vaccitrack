@@ -5,6 +5,7 @@ import { PatientDetailPage } from './pages/PatientDetailPage'
 import { NewPatientPage } from './pages/NewPatientPage'
 import { EditPatientPage } from './pages/EditPatientPage'
 import { PlanPage } from './pages/PlanPage'
+import { ReportsPage } from './pages/ReportsPage'
 import { NewVaccinationPage } from './pages/NewVaccinationPage'
 import { VaccinesPage } from './pages/VaccinesPage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -29,6 +30,7 @@ export default function App() {
             <Route path="/patients/:id/edit" element={<EditPatientPage />} />
             <Route path="/patients/:id" element={<PatientDetailPage />} />
             <Route path="/plan" element={<PlanPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
             <Route path="/vaccines" element={<VaccinesPage />} />
             <Route path="/settings" element={<SettingsPage />}>
               <Route index element={<Navigate to="districts" replace />} />

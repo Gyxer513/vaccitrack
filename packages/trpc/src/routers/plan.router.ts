@@ -42,6 +42,7 @@ export const planRouter = router({
     .input(
       z.object({
         districtId: z.string(),
+        catalogId: z.string().optional().nullable(),
         fromDate: z.coerce.date(),
         toDate: z.coerce.date(),
       }),
@@ -56,6 +57,12 @@ export const planRouter = router({
         include: { site: true },
       })
       if (!district) throw new TRPCError({ code: 'NOT_FOUND', message: 'Участок не найден' })
+
+      if (input.catalogId) {
+        await ctx.prisma.catalog.findFirstOrThrow({
+          where: { id: input.catalogId, scope: ctx.dept, isActive: true },
+        })
+      }
 
       const patients = await ctx.prisma.patient.findMany({
         where: {
@@ -90,7 +97,7 @@ export const planRouter = router({
       }> = []
 
       for (const p of patients) {
-        const all = await buildPlanForPatient(ctx.prisma, p)
+        const all = await buildPlanForPatient(ctx.prisma, p, { catalogId: input.catalogId })
         const filtered = filterReportableItems(all, input.fromDate, input.toDate)
         if (filtered.length === 0) continue
         result.push({

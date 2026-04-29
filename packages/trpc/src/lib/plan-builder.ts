@@ -152,7 +152,10 @@ export function inferGroup(name: string): PlanGroupKey {
 async function resolveActiveCatalogId(
   prisma: PrismaClient,
   patient: PatientWithRefs,
+  explicitCatalogId?: string | null,
 ): Promise<string | null> {
+  if (explicitCatalogId) return explicitCatalogId
+
   const activeId = patient.district?.site?.activeCatalogId ?? null
   if (activeId) return activeId
 
@@ -384,11 +387,11 @@ function evaluateSchedule(
 export async function buildPlanForPatient(
   prisma: PrismaClient,
   patient: PatientWithRefs,
-  options: { now?: Date } = {},
+  options: { now?: Date; catalogId?: string | null } = {},
 ): Promise<PlanItem[]> {
   const now = options.now ?? new Date()
 
-  const catalogId = await resolveActiveCatalogId(prisma, patient)
+  const catalogId = await resolveActiveCatalogId(prisma, patient, options.catalogId)
   if (!catalogId) return []
 
   const schedules = await collectSchedules(prisma, catalogId)

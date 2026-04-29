@@ -5,6 +5,7 @@ import { IconSettings } from '../vaccination/icons'
 const nav = [
   { to: '/patients', label: 'Пациенты' },
   { to: '/plan', label: 'План прививок' },
+  { to: '/reports', label: 'Отчеты' },
   { to: '/vaccines', label: 'Вакцины' },
 ]
 

@@ -36,6 +36,12 @@ model Site {
   // Отделение: детское/взрослое. Определяет фильтрацию пациентов и UI-палитру.
   dept           Dept         @default(KID)
 
+  // Активный для этого Site календарь прививок. План пациента собирается
+  // именно по нему (с учётом parent-цепочки — например, МСК-каталог
+  // расширяет РФ-1122н). Может быть пустым на старте — пока legacy.
+  activeCatalogId String?
+  activeCatalog   Catalog? @relation("SiteActiveCatalog", fields: [activeCatalogId], references: [id])
+
   districts District[]
   doctors   Doctor[]
 }
@@ -51,6 +57,34 @@ enum ScheduleScope {
   KID
   ADULT
   BOTH
+}
+
+// Календарь прививок — набор позиций (VaccineSchedule), утверждённый
+// конкретным приказом. У каждого Site (отделения) активен один каталог.
+// Региональный календарь (МСК-207) может расширять федеральный (РФ-1122н)
+// через parentCatalogId — план учитывает позиции parent + child.
+model Catalog {
+  id              String   @id @default(cuid())
+  name            String   // «Национальный календарь РФ (Приказ 1122н)»
+  region          String   // «RU» | «RU-MSK» | «RU-SPB» | …
+  scope           Dept     // KID | ADULT — для какого отделения
+  approvalRef     String?  // «Приказ МЗ РФ № 1122н от 06.12.2021»
+  validFrom       DateTime?
+  validTo         DateTime?
+  isActive        Boolean  @default(true)
+  isLegacy        Boolean  @default(false) // флаг для импортированного из FoxPro
+
+  // Расширение: МСК наследует РФ. План пациента рекурсивно собирает
+  // позиции из parent-цепочки.
+  parentCatalogId String?
+  parentCatalog   Catalog? @relation("CatalogChain", fields: [parentCatalogId], references: [id])
+  childCatalogs   Catalog[] @relation("CatalogChain")
+
+  schedules       VaccineSchedule[]
+  activeForSites  Site[]   @relation("SiteActiveCatalog")
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model User {
@@ -140,6 +174,19 @@ model VaccineSchedule {
   // Какому отделению принадлежит позиция календаря.
   // BOTH — общая (например, грипп / Covid-19).
   targetDept ScheduleScope @default(BOTH)
+
+  // Привязка к каталогу (РФ-1122н, МСК-207, LEGACY_FOXPRO).
+  // Nullable — для совместимости с импортированными legacy-позициями
+  // во время миграции. После сидера 1122н всем будет проставлено.
+  catalogId String?
+  catalog   Catalog? @relation(fields: [catalogId], references: [id])
+
+  // Условия применимости (для сборщика плана).
+  // Для всех опциональных — null означает «условие не накладывается».
+  appliesToSex       Sex?     // только этому полу (например, краснуха женщины 18-25)
+  isEpidContact      Boolean  @default(false) // «контактные из очагов» (прил. 2 1122н)
+  isCatchUp          Boolean  @default(false) // вакцинация «вдогонку» для не привитых
+  catchUpMaxAgeYears Int?     // верхний предел возраста для catch-up (например, 17 лет для ВГВ)
 
   minAgeYears  Int @default(0)
   minAgeMonths Int @default(0)
@@ -233,7 +280,7 @@ model Patient {
   isAlive         Boolean @default(true)
   isDecret        Boolean @default(false)
   isGkdc          Boolean @default(false)
-  isSelfOrganized Boolean @default(false)
+  isOrganized     Boolean @default(false)
 
   activeMedExemptionId String?
   activeMedExemption   PatientMedExemption? @relation("ActiveExemption", fields: [activeMedExemptionId], references: [id])

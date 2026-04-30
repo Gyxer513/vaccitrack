@@ -88,13 +88,13 @@ export function PatientsPage() {
                           <Link to={`/patients/${p.id}`} className="vt-link">
                             {p.lastName} {p.firstName} {p.middleName ?? ''}
                           </Link>
-                          {dept === 'KID' && p.isSelfOrganized && (
+                          {dept === 'KID' && p.isOrganized && (
                             <span
                               className="vt-hint"
                               style={{ marginLeft: 6 }}
-                              title="Самоорганизованный (прививается в саду / школе)"
+                              title="Организованные (прививается в саду / школе)"
                             >
-                              (сам.)
+                              (орг.)
                             </span>
                           )}
                         </div>

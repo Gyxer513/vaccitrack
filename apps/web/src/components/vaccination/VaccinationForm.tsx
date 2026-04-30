@@ -19,14 +19,13 @@ import {
   STATUS_ORDER,
   getLastDose,
   getScheduleDisplay,
-  getScheduleStatus,
   suggestedDoseLabel,
   type CategoryColor,
   type ScheduleStatus,
 } from './schedule-display'
 
 type Mode = 'vaccination' | 'exemption'
-type StatusFilter = 'all' | 'overdue' | 'due-soon' | 'planned' | 'never'
+type StatusFilter = 'all' | 'overdue' | 'due-soon' | 'planned' | 'never' | 'exempt'
 
 // Локальная дата (YYYY-MM-DD) без TZ-конверсии. toISOString даёт UTC и после 21:00 по МСК
 // возвращает завтрашнюю дату — это ломало max={today()} и парсинг при submit.
@@ -78,7 +77,7 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
   const navigate = useNavigate()
 
   const patientQ = trpc.patient.getById.useQuery({ id: patientId })
-  const schedulesQ = trpc.reference.schedules.useQuery()
+  const planQ = trpc.plan.forPatient.useQuery({ patientId })
   const vaccinesQ = trpc.reference.vaccines.useQuery()
   const doctorsQ = trpc.reference.doctors.useQuery()
   const exemptionTypesQ = trpc.reference.medExemptionTypes.useQuery()
@@ -123,7 +122,11 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
 
   const patient = patientQ.data
-  const schedules = schedulesQ.data
+  const planItems = planQ.data
+  const schedules = useMemo(
+    () => planItems?.filter((item) => item.status !== 'epid').map((item) => item.schedule) ?? [],
+    [planItems],
+  )
   const vaccines = vaccinesQ.data
   const doctors = doctorsQ.data
   const exemptionTypes = exemptionTypesQ.data
@@ -162,23 +165,25 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
 
   // Обогащённый список schedules со статусом для сортировки/фильтрации/рендера
   const enrichedSchedules = useMemo(() => {
-    if (!schedules || !patient) return []
-    return schedules.map((s) => {
-      const status = getScheduleStatus(s, patient.birthday, patient.vaccinationRecords)
+    if (!planItems || !patient) return []
+    return planItems.filter((item) => item.status !== 'epid').map((item) => {
+      const s = item.schedule
+      const status = item.status as ScheduleStatus
       const last = getLastDose(s.id, patient.vaccinationRecords)
       const disp = getScheduleDisplay(s)
       return { schedule: s, status, lastDose: last, display: disp }
     })
-  }, [schedules, patient])
+  }, [planItems, patient])
 
   // Счётчики для табов
   const statusCounts = useMemo(() => {
-    const c = { all: enrichedSchedules.length, overdue: 0, 'due-soon': 0, planned: 0, never: 0 }
+    const c = { all: enrichedSchedules.length, overdue: 0, 'due-soon': 0, planned: 0, never: 0, exempt: 0 }
     for (const e of enrichedSchedules) {
       if (e.status === 'overdue') c.overdue++
       else if (e.status === 'due-soon') c['due-soon']++
       else if (e.status === 'planned') c.planned++
       else if (e.status === 'never') c.never++
+      else if (e.status === 'exempt') c.exempt++
     }
     return c
   }, [enrichedSchedules])
@@ -438,6 +443,7 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
                       { k: 'due-soon', label: 'Скоро', count: statusCounts['due-soon'], tone: 'amber' },
                       { k: 'planned', label: 'В плане', count: statusCounts.planned, tone: 'accent' },
                       { k: 'never', label: 'Не делали', count: statusCounts.never, tone: 'violet' },
+                      { k: 'exempt', label: 'Медотвод', count: statusCounts.exempt, tone: 'amber' },
                     ] as const
                   ).map((t) => (
                     <button
@@ -453,7 +459,7 @@ export function VaccinationForm({ patientId }: { patientId: string }) {
                 </div>
               </div>
 
-              {schedulesQ.isLoading ? (
+              {planQ.isLoading ? (
                 <div className="vt-loading">Загрузка нозологий…</div>
               ) : visibleSchedules.length === 0 ? (
                 <div className="vt-empty">

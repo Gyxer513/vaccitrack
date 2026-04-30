@@ -1,54 +1,87 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { trpc } from '../lib/trpc'
-import { format } from 'date-fns'
+import { format, addDays } from 'date-fns'
+
+const ISO = (d: Date): string => d.toISOString().slice(0, 10)
 
 export function PlanPage() {
-  const now = new Date()
-  const [month, setMonth] = useState(now.getMonth() + 1)
-  const [year, setYear] = useState(now.getFullYear())
+  const today = useMemo(() => new Date(), [])
   const [districtId, setDistrictId] = useState('')
+  const [catalogId, setCatalogId] = useState('')
+  const [from, setFrom] = useState(ISO(today))
+  const [to, setTo] = useState(ISO(addDays(today, 30)))
 
   const { data: districts } = trpc.reference.districts.useQuery()
-  const { data: plan, isLoading } = trpc.vaccination.planByDistrict.useQuery(
-    { districtId, month, year },
-    { enabled: !!districtId },
+  const { data: catalogs } = trpc.catalog.list.useQuery()
+  const { data: rows, isLoading } = trpc.plan.byDistrict.useQuery(
+    { districtId, catalogId: catalogId || null, fromDate: new Date(from), toDate: new Date(to) },
+    { enabled: !!districtId && !!from && !!to },
   )
+
+  const downloadHref = districtId
+    ? `/api/v1/documents/plan.docx?districtId=${encodeURIComponent(districtId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${catalogId ? `&catalogId=${encodeURIComponent(catalogId)}` : ''}`
+    : '#'
+
+  const districtLabel = districts?.find((d) => d.id === districtId)
+  const totalItems = rows?.reduce((sum, r) => sum + r.items.length, 0) ?? 0
 
   return (
     <div>
       <h1 className="text-xl font-semibold text-gray-900 mb-4">План прививок</h1>
 
-      <div className="flex gap-3 mb-4">
-        <select
-          value={districtId}
-          onChange={(e) => setDistrictId(e.target.value)}
-          className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+      <div className="flex gap-3 mb-4 items-end flex-wrap">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Участок</label>
+          <select
+            value={districtId}
+            onChange={(e) => setDistrictId(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-2 text-sm min-w-[220px]"
+          >
+            <option value="">Выберите участок</option>
+            {districts?.map((d) => (
+              <option key={d.id} value={d.id}>{d.code} — {d.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Календарь</label>
+          <select
+            value={catalogId}
+            onChange={(e) => setCatalogId(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-2 text-sm min-w-[280px]"
+          >
+            <option value="">Активный календарь отделения</option>
+            {catalogs?.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Дата с</label>
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Дата по</label>
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+          />
+        </div>
+        <a
+          href={downloadHref}
+          className={`vt-btn vt-btn-primary ${!districtId ? 'pointer-events-none opacity-50' : ''}`}
+          aria-disabled={!districtId}
+          title="Скачать план прививок (Word)"
         >
-          <option value="">Выберите участок</option>
-          {districts?.map((d) => (
-            <option key={d.id} value={d.id}>{d.code} — {d.name}</option>
-          ))}
-        </select>
-        <select
-          value={month}
-          onChange={(e) => setMonth(Number(e.target.value))}
-          className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-        >
-          {Array.from({ length: 12 }, (_, i) => (
-            <option key={i + 1} value={i + 1}>
-              {new Date(2024, i).toLocaleString('ru-RU', { month: 'long' })}
-            </option>
-          ))}
-        </select>
-        <select
-          value={year}
-          onChange={(e) => setYear(Number(e.target.value))}
-          className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-        >
-          {[2025, 2026, 2027].map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
+          Скачать план в Word ↓
+        </a>
       </div>
 
       {!districtId && (
@@ -57,53 +90,65 @@ export function PlanPage() {
       {districtId && isLoading && (
         <div className="text-center py-12 text-gray-500">Загрузка...</div>
       )}
-      {plan && (
-        <div className="bg-white rounded-lg border border-gray-200">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                {['ФИО', 'Дата рождения', 'Возраст', 'Прививка', 'Плановая дата', 'Статус'].map((h) => (
-                  <th key={h} className="text-left px-4 py-2.5 text-gray-600 font-medium">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {plan.map((item) => {
-                const age = Math.floor(
-                  (Date.now() - new Date(item.patient.birthday).getTime()) /
-                    (1000 * 60 * 60 * 24 * 365.25),
-                )
-                return (
-                  <tr key={item.id}>
-                    <td className="px-4 py-2.5 font-medium">
-                      {item.patient.lastName} {item.patient.firstName}
+      {districtId && !isLoading && rows && rows.length === 0 && (
+        <div className="text-center py-12 text-gray-400">
+          Нет плановых прививок в этом периоде
+          {districtLabel ? ` на участке ${districtLabel.code}` : ''}.
+        </div>
+      )}
+
+      {districtId && rows && rows.length > 0 && (
+        <>
+          <div className="text-sm text-gray-500 mb-2">
+            Пациентов в плане: <span className="font-medium text-gray-700">{rows.length}</span>
+            , позиций: <span className="font-medium text-gray-700">{totalItems}</span>
+          </div>
+          <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left px-4 py-2.5 text-gray-600 font-medium whitespace-nowrap">Пациент</th>
+                  <th className="text-left px-4 py-2.5 text-gray-600 font-medium whitespace-nowrap">Дата рождения</th>
+                  <th className="text-left px-4 py-2.5 text-gray-600 font-medium">Прививки в плане</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {rows.map((r) => (
+                  <tr key={r.patient.id}>
+                    <td className="px-4 py-2.5 font-medium whitespace-nowrap">
+                      {r.patient.lastName} {r.patient.firstName} {r.patient.middleName ?? ''}
                     </td>
-                    <td className="px-4 py-2.5 text-gray-500">
-                      {format(new Date(item.patient.birthday), 'dd.MM.yyyy')}
+                    <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap">
+                      {format(new Date(r.patient.birthday), 'dd.MM.yyyy')}
                     </td>
-                    <td className="px-4 py-2.5 text-gray-500 text-xs">{age} лет</td>
-                    <td className="px-4 py-2.5">{item.vaccineSchedule.name}</td>
-                    <td className="px-4 py-2.5">{format(new Date(item.plannedDate), 'dd.MM.yyyy')}</td>
                     <td className="px-4 py-2.5">
-                      <span
-                        className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                          item.status === 'PLANNED'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}
-                      >
-                        {item.status === 'PLANNED' ? 'Запланировано' : 'Просрочено'}
-                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {r.items.map((it) => (
+                          <span
+                            key={it.scheduleId}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${
+                              it.status === 'overdue'
+                                ? 'bg-red-50 text-red-700 border border-red-200'
+                                : it.status === 'due-soon'
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                : 'bg-blue-50 text-blue-700 border border-blue-200'
+                            }`}
+                            title={`${it.scheduleName} • ${format(new Date(it.dueDate), 'dd.MM.yyyy')} • ${it.status}`}
+                          >
+                            <span className="font-medium">{it.shortCode}</span>
+                            <span className="opacity-70">
+                              {format(new Date(it.dueDate), 'dd.MM')}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
                     </td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-          {plan.length === 0 && (
-            <div className="text-center py-8 text-gray-400">Нет плановых прививок за этот период</div>
-          )}
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   )

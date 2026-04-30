@@ -5,9 +5,13 @@ import { PatientDetailPage } from './pages/PatientDetailPage'
 import { NewPatientPage } from './pages/NewPatientPage'
 import { EditPatientPage } from './pages/EditPatientPage'
 import { PlanPage } from './pages/PlanPage'
+import { ReportsPage } from './pages/ReportsPage'
 import { NewVaccinationPage } from './pages/NewVaccinationPage'
 import { VaccinesPage } from './pages/VaccinesPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { SettingsDistricts } from './components/settings/SettingsDistricts'
+import { SettingsCatalogs } from './components/settings/SettingsCatalogs'
+import { SettingsCatalogDetail } from './components/settings/SettingsCatalogDetail'
 import { ErrorPage } from './pages/ErrorPage'
 
 export default function App() {
@@ -26,8 +30,14 @@ export default function App() {
             <Route path="/patients/:id/edit" element={<EditPatientPage />} />
             <Route path="/patients/:id" element={<PatientDetailPage />} />
             <Route path="/plan" element={<PlanPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
             <Route path="/vaccines" element={<VaccinesPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/settings" element={<SettingsPage />}>
+              <Route index element={<Navigate to="districts" replace />} />
+              <Route path="districts" element={<SettingsDistricts />} />
+              <Route path="catalogs" element={<SettingsCatalogs />} />
+              <Route path="catalogs/:catalogId" element={<SettingsCatalogDetail />} />
+            </Route>
             {/* Неизвестный маршрут */}
             <Route
               path="*"

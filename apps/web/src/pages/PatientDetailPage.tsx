@@ -4,6 +4,7 @@ import { trpc } from '../lib/trpc'
 import { format, differenceInMonths, differenceInYears } from 'date-fns'
 import { MedExemptionDialog } from '../components/patient/MedExemptionDialog'
 import { useDepartment } from '../components/DepartmentProvider'
+import { keycloak } from '../lib/keycloak'
 
 const STATUS_LABEL: Record<string, string> = {
   PLANNED: 'Запланировано',
@@ -136,6 +137,26 @@ export function PatientDetailPage() {
 
   const fullName = `${patient.lastName} ${patient.firstName} ${patient.middleName ?? ''}`.trim()
 
+  async function downloadDocument(kind: 'form063u' | 'certificate') {
+    if (!id) return
+    await keycloak.updateToken(30)
+    const suffix = kind === 'form063u' ? 'form063u.docx' : 'certificate.docx'
+    const response = await fetch(`/api/v1/documents/patients/${id}/${suffix}`, {
+      headers: keycloak.token ? { Authorization: `Bearer ${keycloak.token}` } : undefined,
+    })
+    if (!response.ok) {
+      window.alert('Не удалось сформировать документ')
+      return
+    }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${kind}_${id}.docx`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div style={{ display: 'grid', gap: 22 }}>
       {/* HEADER */}
@@ -186,20 +207,22 @@ export function PatientDetailPage() {
           >
             Медотвод
           </button>
-          <a
-            href={`/api/v1/documents/patients/${id}/form063u.docx`}
+          <button
+            type="button"
+            onClick={() => void downloadDocument('form063u')}
             className="vt-btn vt-btn-ghost"
             title="Скачать Word-документ (можно дописать от руки)"
           >
             063/у ↓
-          </a>
-          <a
-            href={`/api/v1/documents/patients/${id}/certificate.docx`}
+          </button>
+          <button
+            type="button"
+            onClick={() => void downloadDocument('certificate')}
             className="vt-btn vt-btn-ghost"
             title="Скачать сертификат прививок (Word, выдаётся пациенту)"
           >
             Сертификат ↓
-          </a>
+          </button>
         </div>
       </div>
 

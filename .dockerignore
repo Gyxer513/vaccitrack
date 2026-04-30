@@ -1,0 +1,13 @@
+.git
+.idea
+.turbo
+node_modules
+dist
+apps/*/node_modules
+apps/*/dist
+packages/*/node_modules
+packages/*/dist
+*.log
+.env
+.env.local
+infra/nginx/certs

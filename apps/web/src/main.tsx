@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
 import { trpc, trpcClient } from './lib/trpc'
 import App from './App'
+import { AuthGate } from './components/AuthGate'
 import { ConfirmProvider, ToastProvider } from './components/ui/Dialog'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { DepartmentProvider } from './components/DepartmentProvider'
@@ -17,21 +18,21 @@ const queryClient = new QueryClient({
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <trpc.Provider client={trpcClient} queryClient={queryClient}>
-        <QueryClientProvider client={queryClient}>
-          <BrowserRouter>
-            {/* DepartmentProvider внутри BrowserRouter — нужен useNavigate
-                для редиректа на /patients при смене отделения. */}
-            <DepartmentProvider>
-              <ToastProvider>
-                <ConfirmProvider>
-                  <App />
-                </ConfirmProvider>
-              </ToastProvider>
-            </DepartmentProvider>
-          </BrowserRouter>
-        </QueryClientProvider>
-      </trpc.Provider>
+      <AuthGate>
+        <trpc.Provider client={trpcClient} queryClient={queryClient}>
+          <QueryClientProvider client={queryClient}>
+            <BrowserRouter>
+              <DepartmentProvider>
+                <ToastProvider>
+                  <ConfirmProvider>
+                    <App />
+                  </ConfirmProvider>
+                </ToastProvider>
+              </DepartmentProvider>
+            </BrowserRouter>
+          </QueryClientProvider>
+        </trpc.Provider>
+      </AuthGate>
     </ErrorBoundary>
   </React.StrictMode>,
 )

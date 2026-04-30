@@ -16,7 +16,7 @@
  * арифметика дат сделана через нативный Date.
  */
 
-import type { PrismaClient, Patient, VaccineSchedule, VaccinationRecord, PatientMedExemption, Sex } from '@vaccitrack/db'
+import type { PrismaClient, Patient, Vaccine, VaccineSchedule, VaccinationRecord, PatientMedExemption, Sex } from '@vaccitrack/db'
 
 export type PlanGroupKey =
   | 'tuberkulin'
@@ -46,7 +46,10 @@ export type PlanItemStatus =
   | 'epid'
 
 export type PlanItem = {
-  schedule: VaccineSchedule & { parent?: VaccineSchedule | null }
+  schedule: VaccineSchedule & {
+    parent?: VaccineSchedule | null
+    vaccines?: Array<{ vaccine: Vaccine }>
+  }
   status: PlanItemStatus
   dueDate: Date
   /** Возраст, к которому позиция должна быть выполнена. Например «1г.6м.». */
@@ -183,7 +186,10 @@ async function collectSchedules(
 
   const own = await prisma.vaccineSchedule.findMany({
     where: { catalogId, isActive: true },
-    include: { parent: true },
+    include: {
+      parent: true,
+      vaccines: { include: { vaccine: true } },
+    },
   })
   for (const s of own) if (!acc.has(s.id)) acc.set(s.id, s)
 

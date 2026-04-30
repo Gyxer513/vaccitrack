@@ -700,11 +700,6 @@ export class DocumentsService {
       year,
       generatedAt: ru(new Date()),
       rows: buildForm5Rows(records),
-      notes: [
-        'Расчет выполнен по записям VaccinationRecord с датой прививки внутри выбранного месяца.',
-        'Старые записи FoxPro классифицируются по legacy-коду календарной позиции, новые записи - по названию позиции и ее родителя.',
-        'Строки "из них детей" считаются по возрасту пациента на дату прививки: меньше 18 лет.',
-      ],
     }
     return generateForm5Docx(data)
   }
@@ -724,11 +719,6 @@ export class DocumentsService {
       generatedAt: ru(new Date()),
       section1: buildForm6Section1(patients, asOf),
       section2: buildForm6Section2(patients, year),
-      notes: [
-        'Расчет выполнен по пациентам организации, живым и состоящим в базе на 31 декабря отчетного года.',
-        'Старые записи FoxPro классифицируются по legacy-коду календарной позиции, новые записи - по названию позиции и ее родителя.',
-        'Колонки о перенесенной кори, эпидемическом паротите и краснухе заполнены нулями: в текущей схеме нет отдельного структурированного признака перенесенного заболевания.',
-      ],
     }
     return generateForm6Docx(data)
   }
@@ -940,3 +930,4 @@ function buildCertSection(key: CertSectionKey, rows: RecordWithRefs[]): Certific
     ]),
   }
 }
+

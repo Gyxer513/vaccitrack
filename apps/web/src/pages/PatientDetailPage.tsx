@@ -4,7 +4,7 @@ import { trpc } from '../lib/trpc'
 import { format, differenceInMonths, differenceInYears } from 'date-fns'
 import { MedExemptionDialog } from '../components/patient/MedExemptionDialog'
 import { useDepartment } from '../components/DepartmentProvider'
-import { keycloak } from '../lib/keycloak'
+import { downloadDocument as downloadDocumentFile } from '../lib/document-download'
 
 const STATUS_LABEL: Record<string, string> = {
   PLANNED: 'Запланировано',
@@ -139,22 +139,15 @@ export function PatientDetailPage() {
 
   async function downloadDocument(kind: 'form063u' | 'certificate') {
     if (!id) return
-    await keycloak.updateToken(30)
     const suffix = kind === 'form063u' ? 'form063u.docx' : 'certificate.docx'
-    const response = await fetch(`/api/v1/documents/patients/${id}/${suffix}`, {
-      headers: keycloak.token ? { Authorization: `Bearer ${keycloak.token}` } : undefined,
-    })
-    if (!response.ok) {
+    try {
+      await downloadDocumentFile({
+        url: `/api/v1/documents/patients/${id}/${suffix}`,
+        filename: `${kind}_${id}.docx`,
+      })
+    } catch {
       window.alert('Не удалось сформировать документ')
-      return
     }
-    const blob = await response.blob()
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${kind}_${id}.docx`
-    link.click()
-    URL.revokeObjectURL(url)
   }
 
   return (

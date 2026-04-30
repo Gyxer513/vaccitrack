@@ -89,6 +89,8 @@ export const planRouter = router({
         items: Array<{
           scheduleId: string
           scheduleName: string
+          scheduleFullName: string
+          vaccineNames: string[]
           shortCode: string
           group: string
           dueDate: Date
@@ -108,14 +110,27 @@ export const planRouter = router({
             middleName: p.middleName,
             birthday: p.birthday,
           },
-          items: filtered.map((i) => ({
-            scheduleId: i.schedule.id,
-            scheduleName: i.schedule.name,
-            shortCode: i.shortCode,
-            group: i.group,
-            dueDate: i.dueDate,
-            status: i.status,
-          })),
+          items: filtered.map((i) => {
+            const scheduleFullName = [i.schedule.parent?.name, i.schedule.name]
+              .filter(Boolean)
+              .join(' - ')
+            const vaccineNames = (i.schedule.vaccines ?? []).map((link) => {
+              const vaccine = link.vaccine
+              return [vaccine.tradeName || vaccine.name, vaccine.producer]
+                .filter(Boolean)
+                .join(', ')
+            })
+            return {
+              scheduleId: i.schedule.id,
+              scheduleName: i.schedule.name,
+              scheduleFullName,
+              vaccineNames,
+              shortCode: i.shortCode,
+              group: i.group,
+              dueDate: i.dueDate,
+              status: i.status,
+            }
+          }),
         })
       }
       return result

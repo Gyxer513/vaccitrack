@@ -1,6 +1,11 @@
 {
   "realm": "vaccitrack",
   "enabled": true,
+  "loginTheme": "immunova",
+  "displayName": "Immunova",
+  "internationalizationEnabled": true,
+  "supportedLocales": ["ru", "en"],
+  "defaultLocale": "ru",
   "registrationAllowed": false,
   "resetPasswordAllowed": false,
   "loginWithEmailAllowed": true,

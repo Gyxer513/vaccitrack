@@ -1,8 +1,30 @@
 import { useMemo, useState } from 'react'
 import { trpc } from '../lib/trpc'
 import { format, addDays } from 'date-fns'
+import { downloadDocument } from '../lib/document-download'
 
 const ISO = (d: Date): string => d.toISOString().slice(0, 10)
+
+const PLAN_STATUS_LABEL: Record<string, string> = {
+  overdue: 'Просрочено',
+  'due-soon': 'Скоро',
+  planned: 'В плане',
+}
+
+function planItemHint(item: {
+  scheduleFullName?: string
+  scheduleName: string
+  vaccineNames?: string[]
+  dueDate: Date | string
+  status: string
+}) {
+  return [
+    item.scheduleFullName || item.scheduleName,
+    item.vaccineNames?.length ? `Вакцины: ${item.vaccineNames.join('; ')}` : null,
+    `Дата: ${format(new Date(item.dueDate), 'dd.MM.yyyy')}`,
+    `Статус: ${PLAN_STATUS_LABEL[item.status] ?? item.status}`,
+  ].filter(Boolean).join('\n')
+}
 
 export function PlanPage() {
   const today = useMemo(() => new Date(), [])
@@ -24,6 +46,18 @@ export function PlanPage() {
 
   const districtLabel = districts?.find((d) => d.id === districtId)
   const totalItems = rows?.reduce((sum, r) => sum + r.items.length, 0) ?? 0
+
+  async function handleDownloadPlan() {
+    if (!districtId) return
+    try {
+      await downloadDocument({
+        url: downloadHref,
+        filename: `plan_${districtId}_${from}_${to}.docx`,
+      })
+    } catch {
+      window.alert('Не удалось сформировать документ')
+    }
+  }
 
   return (
     <div>
@@ -74,14 +108,16 @@ export function PlanPage() {
             className="border border-gray-300 rounded-md px-3 py-2 text-sm"
           />
         </div>
-        <a
-          href={downloadHref}
-          className={`vt-btn vt-btn-primary ${!districtId ? 'pointer-events-none opacity-50' : ''}`}
+        <button
+          type="button"
+          onClick={() => void handleDownloadPlan()}
+          className={`vt-btn vt-btn-primary ${!districtId ? 'opacity-50' : ''}`}
+          disabled={!districtId}
           aria-disabled={!districtId}
           title="Скачать план прививок (Word)"
         >
           Скачать план в Word ↓
-        </a>
+        </button>
       </div>
 
       {!districtId && (
@@ -133,9 +169,12 @@ export function PlanPage() {
                                 ? 'bg-amber-50 text-amber-700 border border-amber-200'
                                 : 'bg-blue-50 text-blue-700 border border-blue-200'
                             }`}
-                            title={`${it.scheduleName} • ${format(new Date(it.dueDate), 'dd.MM.yyyy')} • ${it.status}`}
+                            title={planItemHint(it)}
                           >
                             <span className="font-medium">{it.shortCode}</span>
+                            <span className="max-w-[11rem] truncate opacity-85">
+                              {it.scheduleName}
+                            </span>
                             <span className="opacity-70">
                               {format(new Date(it.dueDate), 'dd.MM')}
                             </span>

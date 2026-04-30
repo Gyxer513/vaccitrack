@@ -5,6 +5,7 @@
   "scripts": {
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed:rf-1122n": "tsx scripts/seed-calendar-rf-1122n.ts",

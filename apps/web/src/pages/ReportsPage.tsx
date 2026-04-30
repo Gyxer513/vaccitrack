@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { downloadDocument } from '../lib/document-download'
 
 export function ReportsPage() {
   const currentYear = useMemo(() => new Date().getFullYear(), [])
@@ -8,6 +9,14 @@ export function ReportsPage() {
   const [form6Year, setForm6Year] = useState(String(currentYear))
   const form5Href = `/api/v1/documents/form5.docx?year=${encodeURIComponent(form5Year)}&month=${encodeURIComponent(form5Month)}`
   const form6Href = `/api/v1/documents/form6.docx?year=${encodeURIComponent(form6Year)}`
+
+  async function handleDownload(url: string, filename: string) {
+    try {
+      await downloadDocument({ url, filename })
+    } catch {
+      window.alert('Не удалось сформировать документ')
+    }
+  }
 
   return (
     <div>
@@ -65,13 +74,14 @@ export function ReportsPage() {
               </td>
               <td className="px-4 py-3 text-gray-500">Word</td>
               <td className="px-4 py-3 text-right">
-                <a
-                  href={form5Href}
+                <button
+                  type="button"
+                  onClick={() => void handleDownload(form5Href, `form5_${form5Year}_${form5Month.padStart(2, '0')}.docx`)}
                   className="vt-btn vt-btn-primary"
                   title="Скачать форму N 5 (Word)"
                 >
                   Скачать ↓
-                </a>
+                </button>
               </td>
             </tr>
             <tr>
@@ -94,13 +104,14 @@ export function ReportsPage() {
               </td>
               <td className="px-4 py-3 text-gray-500">Word</td>
               <td className="px-4 py-3 text-right">
-                <a
-                  href={form6Href}
+                <button
+                  type="button"
+                  onClick={() => void handleDownload(form6Href, `form6_${form6Year}.docx`)}
                   className="vt-btn vt-btn-primary"
                   title="Скачать форму N 6 (Word)"
                 >
                   Скачать ↓
-                </a>
+                </button>
               </td>
             </tr>
           </tbody>

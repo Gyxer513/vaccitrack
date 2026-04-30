@@ -1,3 +1,5 @@
+name: vaccitrack-deploy-local
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -9,6 +11,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vaccitrack -d vaccitrack"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     networks: [vaccitrack]
 
   keycloak:
@@ -29,9 +36,26 @@ services:
       KC_PROXY: edge
       KC_SPI_THEME_DEFAULT: immunova
     volumes:
-      - ./infra/keycloak:/opt/keycloak/data/import
+      - ./infra/keycloak:/opt/keycloak/data/import:ro
       - ./infra/keycloak-themes:/opt/keycloak/themes:ro
-    depends_on: [postgres]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [vaccitrack]
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: build
+    profiles: ["migrate"]
+    environment:
+      DATABASE_URL: postgresql://vaccitrack:${POSTGRES_PASSWORD:-changeme}@postgres:5432/vaccitrack
+      NODE_ENV: production
+    command: ["pnpm", "--filter", "@vaccitrack/db", "run", "db:migrate:deploy"]
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks: [vaccitrack]
 
   api:
@@ -44,9 +68,13 @@ services:
       KEYCLOAK_URL: http://keycloak:8080/auth
       KEYCLOAK_REALM: vaccitrack
       KEYCLOAK_CLIENT_ID: vaccitrack-api
-      KEYCLOAK_SECRET: ${KEYCLOAK_SECRET}
+      KEYCLOAK_SECRET: ${KEYCLOAK_SECRET:-local-dev-secret}
       NODE_ENV: production
-    depends_on: [postgres, keycloak]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
     networks: [vaccitrack]
 
   web:
@@ -60,12 +88,10 @@ services:
     image: nginx:alpine
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "${VACCITRACK_HTTP_PORT:-18080}:80"
     volumes:
-      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./infra/nginx/certs:/etc/nginx/certs:ro
-    depends_on: [api, web]
+      - ./infra/nginx/nginx.local.conf:/etc/nginx/nginx.conf:ro
+    depends_on: [api, web, keycloak]
     networks: [vaccitrack]
 
 volumes:

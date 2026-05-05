@@ -13,9 +13,15 @@ type TestRecord = VaccinationRecord & {
 }
 
 const today = new Date('2026-05-05T12:00:00.000Z')
+type ApplicableStatus = Extract<ReturnType<typeof evaluateSchedule>, { ok: true }>['status']
+
+function assertStatus(result: ReturnType<typeof evaluateSchedule>, status: ApplicableStatus) {
+  assert.ok(result.ok)
+  assert.equal(result.status, status)
+}
 
 function patient(overrides: Partial<TestPatient> = {}): TestPatient {
-  return {
+  const base: TestPatient = {
     id: 'patient-1',
     organizationId: 'org-1',
     districtId: null,
@@ -50,12 +56,12 @@ function patient(overrides: Partial<TestPatient> = {}): TestPatient {
     createdByLogin: null,
     activeMedExemption: null,
     riskGroup: null,
-    ...overrides,
-  } as TestPatient
+  }
+  return { ...base, ...overrides }
 }
 
 function schedule(overrides: Partial<VaccineSchedule> = {}): VaccineSchedule {
-  return {
+  const base: VaccineSchedule = {
     id: 'schedule-1',
     parentId: null,
     code: '1_1',
@@ -83,12 +89,12 @@ function schedule(overrides: Partial<VaccineSchedule> = {}): VaccineSchedule {
     medExemptionLimitMonths: 0,
     medExemptionLimitYears: 0,
     nextScheduleId: null,
-    ...overrides,
-  } as VaccineSchedule
+  }
+  return { ...base, ...overrides }
 }
 
 function record(overrides: Partial<TestRecord> = {}): TestRecord {
-  return {
+  const base: TestRecord = {
     id: 'record-1',
     patientId: 'patient-1',
     vaccineScheduleId: null,
@@ -108,17 +114,19 @@ function record(overrides: Partial<TestRecord> = {}): TestRecord {
     result: null,
     medExemptionTypeId: null,
     medExemptionDate: null,
+    nextScheduledDate: null,
+    nextScheduleId: null,
     note: null,
     createdAt: new Date('2025-01-01T00:00:00.000Z'),
     updatedAt: new Date('2025-01-01T00:00:00.000Z'),
     vaccineSchedule: null,
-    ...overrides,
-  } as TestRecord
+  }
+  return { ...base, ...overrides }
 }
 
 test('epid schedule returns epid', () => {
   const result = evaluateSchedule(schedule({ isEpid: true }), patient(), [], today)
-  assert.deepEqual(result.ok && result.status, 'epid')
+  assertStatus(result, 'epid')
 })
 
 test('sex mismatch is not applicable', () => {
@@ -137,22 +145,21 @@ test('catch-up above max age is not applicable', () => {
 })
 
 test('active med exemption after due date returns exempt', () => {
+  const activeMedExemption: PatientMedExemption = {
+    id: 'exemption-1',
+    patientId: 'patient-1',
+    medExemptionTypeId: 'type-1',
+    dateFrom: new Date('2026-01-01T00:00:00.000Z'),
+    dateTo: new Date('2026-12-31T00:00:00.000Z'),
+    note: null,
+  }
   const result = evaluateSchedule(
     schedule({ minAgeYears: 1 }),
-    patient({
-      activeMedExemption: {
-        id: 'exemption-1',
-        patientId: 'patient-1',
-        medExemptionTypeId: 'type-1',
-        dateFrom: new Date('2026-01-01T00:00:00.000Z'),
-        dateTo: new Date('2026-12-31T00:00:00.000Z'),
-        note: null,
-      } as PatientMedExemption,
-    }),
+    patient({ activeMedExemption }),
     [],
     today,
   )
-  assert.deepEqual(result.ok && result.status, 'exempt')
+  assertStatus(result, 'exempt')
 })
 
 test('after max age without catch-up returns never', () => {
@@ -162,7 +169,7 @@ test('after max age without catch-up returns never', () => {
     [],
     today,
   )
-  assert.deepEqual(result.ok && result.status, 'never')
+  assertStatus(result, 'never')
 })
 
 test('legacy matching record returns done', () => {
@@ -180,12 +187,12 @@ test('legacy matching record returns done', () => {
     })],
     today,
   )
-  assert.deepEqual(result.ok && result.status, 'done')
+  assertStatus(result, 'done')
 })
 
 test('today equal due date returns overdue', () => {
   const result = evaluateSchedule(schedule({ minAgeYears: 1 }), patient(), [], today)
-  assert.deepEqual(result.ok && result.status, 'overdue')
+  assertStatus(result, 'overdue')
 })
 
 test('due date within 30 days returns due-soon', () => {
@@ -195,7 +202,7 @@ test('due date within 30 days returns due-soon', () => {
     [],
     today,
   )
-  assert.deepEqual(result.ok && result.status, 'due-soon')
+  assertStatus(result, 'due-soon')
 })
 
 test('due date after 30 days returns planned', () => {
@@ -205,7 +212,7 @@ test('due date after 30 days returns planned', () => {
     [],
     today,
   )
-  assert.deepEqual(result.ok && result.status, 'planned')
+  assertStatus(result, 'planned')
 })
 
 test('influenza after first year returns never', () => {
@@ -215,5 +222,5 @@ test('influenza after first year returns never', () => {
     [],
     today,
   )
-  assert.deepEqual(result.ok && result.status, 'never')
+  assertStatus(result, 'never')
 })

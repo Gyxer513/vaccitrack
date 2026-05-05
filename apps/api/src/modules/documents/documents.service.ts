@@ -3,7 +3,7 @@ import { prisma } from '@vaccitrack/db'
 import { generateForm063u, generateForm063uDocx, generateCertificateDocx, generatePlanDocx, generateForm5Docx, generateForm6Docx } from '@vaccitrack/pdf'
 import type { Form063Data, CertificateData, CertificateSection, PlanData, PlanRow, PlanGroupKey, Form5Data, Form5Row, Form6Data, Form6ColumnKey, Form6Section1Row, Form6Section2Row } from '@vaccitrack/pdf'
 import type { Form063Row, Form063OtherRow, VacRevSplit } from '@vaccitrack/pdf'
-import { buildPlanForPatient, filterReportableItems } from '@vaccitrack/trpc'
+import { buildPlanForPatient, collectSchedules, filterReportableItems, resolveCatalogIdForDistrict } from '@vaccitrack/trpc'
 
 type RecordWithRefs = Awaited<ReturnType<typeof loadRecords>>[number]
 
@@ -749,16 +749,24 @@ export class DocumentsService {
     const patients = await prisma.patient.findMany({
       where: { organizationId: orgId, districtId, isAlive: true },
       include: {
-        vaccinationRecords: true,
+        vaccinationRecords: { include: { vaccineSchedule: true } },
         activeMedExemption: true,
+        riskGroup: { select: { name: true } },
         district: { include: { site: true } },
       },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     })
 
+    const planCatalogId = await resolveCatalogIdForDistrict(prisma, district, selectedCatalog?.id)
+    const schedules = planCatalogId ? await collectSchedules(prisma, planCatalogId) : []
+
     const rows: PlanRow[] = []
     for (const p of patients) {
-      const all = await buildPlanForPatient(prisma, p, { catalogId: selectedCatalog?.id })
+      const all = await buildPlanForPatient(prisma, p, {
+        catalogId: planCatalogId,
+        records: p.vaccinationRecords,
+        schedules,
+      })
       const filtered = filterReportableItems(all, fromDate, toDate)
       if (filtered.length === 0) continue
 

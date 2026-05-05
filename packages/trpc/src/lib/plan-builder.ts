@@ -69,6 +69,18 @@ type VaccinationRecordWithSchedule = VaccinationRecord & {
   vaccineSchedule?: Pick<VaccineSchedule, 'id' | 'code' | 'name' | 'shortName' | 'catalogId'> | null
 }
 
+type PlanSchedule = VaccineSchedule & {
+  parent?: VaccineSchedule | null
+  vaccines?: Array<{ vaccine: Vaccine }>
+}
+
+type BuildPlanOptions = {
+  now?: Date
+  catalogId?: string | null
+  records?: VaccinationRecordWithSchedule[]
+  schedules?: PlanSchedule[]
+}
+
 /* ——— даты ——— */
 
 function addYMD(base: Date, years: number, months: number, days: number): Date {
@@ -90,8 +102,10 @@ function startOfDay(d: Date): Date {
 }
 
 function ageInYears(birthday: Date, at: Date): number {
-  const ms = at.getTime() - birthday.getTime()
-  return ms / (1000 * 60 * 60 * 24 * 365.25)
+  let years = at.getFullYear() - birthday.getFullYear()
+  const months = at.getMonth() - birthday.getMonth()
+  if (months < 0 || (months === 0 && at.getDate() < birthday.getDate())) years -= 1
+  return Math.max(years, 0)
 }
 
 function ageLabel(years: number, months: number, days: number): string {
@@ -144,7 +158,7 @@ export function inferGroup(name: string): PlanGroupKey {
   if (/гемофил/.test(n)) return 'hib'
   if (/менингокок/.test(n)) return 'meningo'
   if (/ветрян/.test(n)) return 'varicella'
-  if (/covid|коронавир/.test(n)) return 'covid'
+  if (/(^|[^a-zа-яё])(covid|коронавир)/i.test(n)) return 'covid'
   if (/грипп/.test(n)) return 'influenza'
   if (/папиллом|hpv/.test(n)) return 'hpv'
   return 'other'
@@ -171,13 +185,36 @@ async function resolveActiveCatalogId(
   return fallback?.id ?? null
 }
 
-async function collectSchedules(
+export async function resolveCatalogIdForDistrict(
+  prisma: PrismaClient,
+  district: { site?: { activeCatalogId: string | null; dept: 'KID' | 'ADULT' } | null },
+  explicitCatalogId?: string | null,
+): Promise<string | null> {
+  if (explicitCatalogId) return explicitCatalogId
+
+  const activeId = district.site?.activeCatalogId ?? null
+  if (activeId) return activeId
+
+  const dept = district.site?.dept ?? 'KID'
+  const fallback = await prisma.catalog.findFirst({
+    where: { region: 'RU', scope: dept, isActive: true },
+    select: { id: true },
+  })
+  return fallback?.id ?? null
+}
+
+export async function collectSchedules(
   prisma: PrismaClient,
   catalogId: string,
-  depth = 0,
-  acc: Map<string, VaccineSchedule & { parent?: VaccineSchedule | null }> = new Map(),
-): Promise<Array<VaccineSchedule & { parent?: VaccineSchedule | null }>> {
-  if (depth > 5) return Array.from(acc.values()) // защита от циклов
+  visited: Set<string> = new Set(),
+  acc: Map<string, PlanSchedule> = new Map(),
+): Promise<PlanSchedule[]> {
+  if (visited.has(catalogId)) {
+    console.warn(`Catalog cycle detected at ${catalogId}`)
+    return Array.from(acc.values())
+  }
+  visited.add(catalogId)
+
   const cat = await prisma.catalog.findUnique({
     where: { id: catalogId },
     select: { id: true, parentCatalogId: true },
@@ -194,7 +231,7 @@ async function collectSchedules(
   for (const s of own) if (!acc.has(s.id)) acc.set(s.id, s)
 
   if (cat.parentCatalogId) {
-    await collectSchedules(prisma, cat.parentCatalogId, depth + 1, acc)
+    await collectSchedules(prisma, cat.parentCatalogId, visited, acc)
   }
   return Array.from(acc.values())
 }
@@ -208,12 +245,16 @@ function isExemptionActive(ex: PatientMedExemption | null | undefined, now: Date
 }
 
 const DUE_SOON_DAYS = 30
+// TODO: move narrow max-age windows into VaccineSchedule data.
+const NARROW_TO_FIRST_YEAR_GROUPS = new Set<PlanGroupKey>(['influenza'])
 
 type DoseStage = {
   phase: 'v' | 'rv'
   number: number | null
 }
 
+// Legacy prefixes come from imported FoxPro schedule codes in VaccineSchedule.code.
+// The code format is "<prefix>_<step>"; prefixes map imported records to report groups.
 const LEGACY_GROUP_BY_PREFIX: Record<string, PlanGroupKey> = {
   '1': 'bcg',
   '2': 'akds',
@@ -286,6 +327,7 @@ function stageFromLegacyCode(code: string | null | undefined): DoseStage | null 
 
   if (legacy.step >= 1 && legacy.step <= 3) return { phase: 'v', number: legacy.step }
   if (legacy.step >= 4 && legacy.step <= 6) return { phase: 'rv', number: legacy.step - 3 }
+  console.warn(`Unhandled legacy vaccine schedule code: ${code}`)
   return null
 }
 
@@ -327,7 +369,7 @@ type ApplicabilityResult =
   | { ok: true; dueDate: Date; status: PlanItemStatus }
   | { ok: false }
 
-function evaluateSchedule(
+export function evaluateSchedule(
   schedule: VaccineSchedule,
   patient: PatientWithRefs,
   records: VaccinationRecordWithSchedule[],
@@ -356,7 +398,7 @@ function evaluateSchedule(
   const today = startOfDay(now)
   const dueDate = startOfDay(addYMD(patient.birthday, schedule.minAgeYears, schedule.minAgeMonths, schedule.minAgeDays))
   const maxDate = startOfDay(
-    (scheduleGroup === 'influenza' || (scheduleGroup === 'rota' && schedule.maxAgeYears === 99))
+    (NARROW_TO_FIRST_YEAR_GROUPS.has(scheduleGroup) || (scheduleGroup === 'rota' && schedule.maxAgeYears === 99))
       ? addYMD(patient.birthday, 1, 0, 0)
       : addYMD(patient.birthday, schedule.maxAgeYears, schedule.maxAgeMonths, schedule.maxAgeDays),
   )
@@ -393,36 +435,39 @@ function evaluateSchedule(
 export async function buildPlanForPatient(
   prisma: PrismaClient,
   patient: PatientWithRefs,
-  options: { now?: Date; catalogId?: string | null } = {},
+  options: BuildPlanOptions = {},
 ): Promise<PlanItem[]> {
   const now = options.now ?? new Date()
 
   const catalogId = await resolveActiveCatalogId(prisma, patient, options.catalogId)
   if (!catalogId) return []
 
-  const schedules = await collectSchedules(prisma, catalogId)
+  const schedules = options.schedules ?? await collectSchedules(prisma, catalogId)
   if (schedules.length === 0) return []
 
   // Записи и медотвод: предпочитаем уже подгруженные, иначе достаём из БД.
-  const records = await prisma.vaccinationRecord.findMany({
-    where: { patientId: patient.id },
+  const records = options.records ?? await prisma.vaccinationRecord.findMany({
+    where: { patientId: patient.id, patient: { organizationId: patient.organizationId } },
     include: { vaccineSchedule: true },
   })
-  if (patient.activeMedExemption === undefined && patient.activeMedExemptionId) {
-    patient.activeMedExemption = await prisma.patientMedExemption.findUnique({
-      where: { id: patient.activeMedExemptionId },
-    })
-  }
-  if (patient.riskGroup === undefined && patient.riskGroupId) {
-    patient.riskGroup = await prisma.riskGroup.findUnique({
-      where: { id: patient.riskGroupId },
-      select: { name: true },
-    })
-  }
+  const activeMedExemption = patient.activeMedExemption !== undefined
+    ? patient.activeMedExemption
+    : patient.activeMedExemptionId
+      ? await prisma.patientMedExemption.findUnique({ where: { id: patient.activeMedExemptionId } })
+      : null
+  const riskGroup = patient.riskGroup !== undefined
+    ? patient.riskGroup
+    : patient.riskGroupId
+      ? await prisma.riskGroup.findUnique({
+        where: { id: patient.riskGroupId },
+        select: { name: true },
+      })
+      : null
+  const patientForEvaluation: PatientWithRefs = { ...patient, activeMedExemption, riskGroup }
 
   const items: PlanItem[] = []
   for (const s of schedules) {
-    const r = evaluateSchedule(s, patient, records, now)
+    const r = evaluateSchedule(s, patientForEvaluation, records, now)
     if (!r.ok) continue
     items.push({
       schedule: s,
@@ -454,10 +499,10 @@ export function filterReportableItems(
   const to = startOfDay(toDate)
   return items.filter((i) => {
     if (!['overdue', 'due-soon', 'planned'].includes(i.status)) return false
-    const due = startOfDay(i.dueDate)
-    if (due.getTime() > to.getTime()) return false
+    const itemDueDate = startOfDay(i.dueDate)
+    if (itemDueDate.getTime() > to.getTime()) return false
     if (i.status === 'overdue') return true
-    if (due.getTime() < from.getTime()) return false
+    if (itemDueDate.getTime() < from.getTime()) return false
     return true
   })
 }

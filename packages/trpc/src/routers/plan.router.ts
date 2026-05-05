@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure } from '../init'
-import { buildPlanForPatient, filterReportableItems } from '../lib/plan-builder'
+import { buildPlanForPatient, collectSchedules, filterReportableItems, resolveCatalogIdForDistrict } from '../lib/plan-builder'
 
 /**
  * Plan router — сборщик плана прививок.
@@ -28,14 +28,15 @@ export const planRouter = router({
       const patient = await ctx.prisma.patient.findFirst({
         where: { id: input.patientId, organizationId: ctx.user.orgId },
         include: {
-          vaccinationRecords: true,
+          vaccinationRecords: { include: { vaccineSchedule: true } },
           activeMedExemption: true,
+          riskGroup: { select: { name: true } },
           district: { include: { site: true } },
         },
       })
       if (!patient) throw new TRPCError({ code: 'NOT_FOUND', message: 'Пациент не найден' })
 
-      return buildPlanForPatient(ctx.prisma, patient)
+      return buildPlanForPatient(ctx.prisma, patient, { records: patient.vaccinationRecords })
     }),
 
   byDistrict: protectedProcedure
@@ -71,12 +72,16 @@ export const planRouter = router({
           isAlive: true,
         },
         include: {
-          vaccinationRecords: true,
+          vaccinationRecords: { include: { vaccineSchedule: true } },
           activeMedExemption: true,
+          riskGroup: { select: { name: true } },
           district: { include: { site: true } },
         },
         orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
       })
+
+      const catalogId = await resolveCatalogIdForDistrict(ctx.prisma, district, input.catalogId)
+      const schedules = catalogId ? await collectSchedules(ctx.prisma, catalogId) : []
 
       const result: Array<{
         patient: {
@@ -99,7 +104,11 @@ export const planRouter = router({
       }> = []
 
       for (const p of patients) {
-        const all = await buildPlanForPatient(ctx.prisma, p, { catalogId: input.catalogId })
+        const all = await buildPlanForPatient(ctx.prisma, p, {
+          catalogId,
+          records: p.vaccinationRecords,
+          schedules,
+        })
         const filtered = filterReportableItems(all, input.fromDate, input.toDate)
         if (filtered.length === 0) continue
         result.push({

@@ -2,6 +2,7 @@ import { createTRPCReact } from '@trpc/react-query'
 import { httpBatchLink } from '@trpc/client'
 import type { AppRouter } from '@vaccitrack/trpc'
 import { readDeptFromStorage } from './dept'
+import { keycloak } from './keycloak'
 
 export const trpc = createTRPCReact<AppRouter>()
 
@@ -11,9 +12,11 @@ export const trpcClient = trpc.createClient({
       url: '/trpc',
       // headers() вызывается при каждом батч-запросе. Берём актуальный dept
       // прямо из localStorage — переключатель в шапке туда же пишет.
-      headers: () => ({
-        'x-dept': readDeptFromStorage(),
-      }),
+      headers: () => {
+        const headers: Record<string, string> = { 'x-dept': readDeptFromStorage() }
+        if (keycloak.token) headers.Authorization = `Bearer ${keycloak.token}`
+        return headers
+      },
     }),
   ],
 })

@@ -26,7 +26,6 @@ export type Form5Data = {
   year: number
   generatedAt: string
   rows: Form5Row[]
-  notes?: string[]
 }
 
 const FONT = 'Times New Roman'
@@ -91,14 +90,6 @@ function buildTable(rows: Form5Row[]): Table {
           cell('Число привитых', { width: widths[2], bold: true, size: 9, shading: 'F0F0F0' }),
         ],
       }),
-      new TableRow({
-        tableHeader: true,
-        children: [
-          cell('1', { width: widths[0], size: 8 }),
-          cell('2', { width: widths[1], size: 8 }),
-          cell('3', { width: widths[2], size: 8 }),
-        ],
-      }),
       ...rows.map((r) => new TableRow({
         children: [
           cell(r.label, { width: widths[0], size: 8, align: AlignmentType.LEFT }),
@@ -123,12 +114,6 @@ export async function generateForm5Docx(data: Form5Data): Promise<Buffer> {
     new Paragraph({ spacing: { after: 120 }, children: [] }),
     buildTable(data.rows),
   ]
-
-  if (data.notes?.length) {
-    children.push(new Paragraph({ spacing: { after: 120 }, children: [] }))
-    children.push(para('Примечания к автоматическому расчету:', { bold: true, size: 8 }))
-    for (const note of data.notes) children.push(para(note, { size: 8 }))
-  }
 
   const doc = new Document({
     creator: 'Immunova',

@@ -41,7 +41,6 @@ export type Form6Data = {
   generatedAt: string
   section1: Form6Section1Row[]
   section2: Form6Section2Row[]
-  notes?: string[]
 }
 
 const FONT = 'Times New Roman'
@@ -247,11 +246,6 @@ export async function generateForm6Docx(data: Form6Data): Promise<Buffer> {
     section2Table(data.section2),
   )
 
-  if (data.notes?.length) {
-    children.push(emptyPara(), para('Примечания к автоматическому расчету:', { bold: true, size: 8 }))
-    for (const note of data.notes) children.push(para(note, { size: 8 }))
-  }
-
   const doc = new Document({
     creator: 'Immunova',
     title: `Форма 6 за ${data.year} год`,
@@ -277,3 +271,4 @@ export async function generateForm6Docx(data: Form6Data): Promise<Buffer> {
 
   return Packer.toBuffer(doc) as Promise<Buffer>
 }
+

@@ -1,4 +1,7 @@
-FROM node:20-alpine AS base
+FROM node:20-bookworm-slim AS base
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /app
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
@@ -15,9 +18,10 @@ COPY . .
 RUN pnpm --filter @vaccitrack/db run db:generate
 RUN pnpm --filter @vaccitrack/api run build
 
-FROM node:20-alpine AS runner
-WORKDIR /app
-COPY --from=build /app/apps/api/dist ./dist
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/packages ./packages
-CMD ["node", "dist/main"]
+FROM node:20-bookworm-slim AS runner
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+WORKDIR /app/apps/api
+COPY --from=build /app /app
+CMD ["node", "--import", "tsx", "dist/main"]

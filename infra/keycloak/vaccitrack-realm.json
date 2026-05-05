@@ -1,0 +1,84 @@
+{
+  "realm": "vaccitrack",
+  "enabled": true,
+  "loginTheme": "immunova",
+  "displayName": "Immunova",
+  "internationalizationEnabled": true,
+  "supportedLocales": ["ru", "en"],
+  "defaultLocale": "ru",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "roles": {
+    "realm": [
+      { "name": "admin" },
+      { "name": "doctor" },
+      { "name": "nurse" },
+      { "name": "registrar" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "vaccitrack-web",
+      "name": "VacciTrack Web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "redirectUris": [
+        "https://localhost/*",
+        "http://localhost/*",
+        "https://vaccitrack.lrc.local/*",
+        "http://vaccitrack.lrc.local/*"
+      ],
+      "webOrigins": ["+"],
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "name": "org_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "org_id",
+            "claim.name": "org_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "vaccitrack-api",
+      "name": "VacciTrack API",
+      "enabled": true,
+      "bearerOnly": true,
+      "protocol": "openid-connect"
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@vaccitrack.local",
+      "emailVerified": true,
+      "firstName": "VacciTrack",
+      "lastName": "Admin",
+      "attributes": {
+        "org_id": ["6c8295ee-eeea-429d-aa02-b4be3a964a8d"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin", "doctor", "nurse", "registrar"]
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { DepartmentSwitcher } from '../DepartmentSwitcher'
 import { IconSettings } from '../vaccination/icons'
+import { keycloak } from '../../lib/keycloak'
 
 const nav = [
   { to: '/patients', label: 'Пациенты' },
@@ -11,6 +12,15 @@ const nav = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation()
+  const userName =
+    keycloak.tokenParsed?.name ??
+    keycloak.tokenParsed?.preferred_username ??
+    'Пользователь'
+
+  function handleLogout() {
+    void keycloak.logout({ redirectUri: window.location.origin })
+  }
+
   return (
     <div className="vt-app">
       <header className="vt-topbar">
@@ -45,7 +55,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
           >
             <IconSettings size={18} />
           </Link>
-          <span className="vt-user">Администратор</span>
+          <span className="vt-user">{userName}</span>
+          <button type="button" className="vt-logout" onClick={handleLogout}>
+            Выйти
+          </button>
         </div>
       </header>
       <main className="vt-main">{children}</main>

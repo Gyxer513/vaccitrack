@@ -7,7 +7,7 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "typecheck": "turbo run typecheck",
+    "typecheck": "turbo run db:generate && turbo run typecheck",
     "db:generate": "turbo run db:generate",
     "db:migrate": "turbo run db:migrate",
     "db:migrate:deploy": "turbo run db:migrate:deploy"

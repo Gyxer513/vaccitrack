@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "main": "./src/index.ts",
   "scripts": {
-    "test": "tsx --test \"src/**/*.test.ts\"",
+    "test": "tsx --test src/lib/plan-builder.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

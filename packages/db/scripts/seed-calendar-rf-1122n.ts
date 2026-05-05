@@ -15,7 +15,7 @@
  * NB: Legacy schedules с catalogId=NULL (импорт из FoxPro) не трогаем.
  */
 
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, type Prisma } from '@prisma/client'
 import {
   upsertCatalog,
   replaceSchedules,
@@ -433,7 +433,7 @@ const ADULT_SCHEDULES: ScheduleSeed[] = [...ADULT_PLAN_SCHEDULES, ...ADULT_EPID_
 async function main() {
   console.log(`${LOG_TAG} Старт сидера приказа МЗ РФ № 1122н`)
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const kidCatalog = await upsertCatalog(tx, {
       name: 'Национальный календарь РФ (детский)',
       region: REGION,

@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: vaccitrack
       POSTGRES_USER: vaccitrack
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.deploy-local}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
@@ -26,10 +26,10 @@ services:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/vaccitrack
       KC_DB_USERNAME: vaccitrack
-      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.deploy-local}
       KC_DB_SCHEMA: keycloak
       KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-changeme}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD in .env.deploy-local}
       KC_HOSTNAME_STRICT: false
       KC_HTTP_ENABLED: true
       KC_HTTP_RELATIVE_PATH: /auth
@@ -50,7 +50,7 @@ services:
       target: build
     profiles: ["migrate"]
     environment:
-      DATABASE_URL: postgresql://vaccitrack:${POSTGRES_PASSWORD:-changeme}@postgres:5432/vaccitrack
+      DATABASE_URL: postgresql://vaccitrack:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.deploy-local}@postgres:5432/vaccitrack
       NODE_ENV: production
     command: ["pnpm", "--filter", "@vaccitrack/db", "run", "db:migrate:deploy"]
     depends_on:
@@ -64,11 +64,11 @@ services:
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://vaccitrack:${POSTGRES_PASSWORD:-changeme}@postgres:5432/vaccitrack
+      DATABASE_URL: postgresql://vaccitrack:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.deploy-local}@postgres:5432/vaccitrack
       KEYCLOAK_URL: http://keycloak:8080/auth
       KEYCLOAK_REALM: vaccitrack
       KEYCLOAK_CLIENT_ID: vaccitrack-api
-      KEYCLOAK_SECRET: ${KEYCLOAK_SECRET:-local-dev-secret}
+      KEYCLOAK_SECRET: ${KEYCLOAK_SECRET:?Set KEYCLOAK_SECRET in .env.deploy-local}
       NODE_ENV: production
     depends_on:
       postgres:

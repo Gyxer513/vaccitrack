@@ -27,7 +27,7 @@
  *   создадутся без parent с предупреждением)
  */
 
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, type Prisma } from '@prisma/client'
 import {
   upsertCatalog,
   replaceSchedules,
@@ -126,7 +126,7 @@ async function main() {
   const kidParentId = await findRfParentId('KID')
   const adultParentId = await findRfParentId('ADULT')
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const kidCatalog = await upsertCatalog(tx, {
       name: 'Региональный календарь Москвы (детский)',
       region: REGION,

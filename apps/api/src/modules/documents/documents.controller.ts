@@ -1,7 +1,9 @@
-import { Controller, Get, Inject, Param, Query, Res, Req } from '@nestjs/common'
+import { Controller, ForbiddenException, Get, Inject, Param, Query, Res, Req } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger'
+import { allowedDepartmentsForRoles } from '@vaccitrack/trpc'
 import { DocumentsService } from './documents.service'
 import type { Request, Response } from 'express'
+import type { Dept } from '@vaccitrack/db'
 
 // Пока Keycloak не подключён — извлекаем orgId из JWT claims вручную,
 // с фолбэком на DEV_ORG_ID (та же логика, что и в tRPC context).
@@ -20,6 +22,37 @@ function resolveOrgId(req: Request): string {
     return process.env.DEV_ORG_ID
   }
   return ''
+}
+
+function requestedDept(req: Request): Dept {
+  const rawDept = String(req.headers['x-dept'] ?? '').toUpperCase()
+  return rawDept === 'ADULT' ? 'ADULT' : 'KID'
+}
+
+function resolveDept(req: Request): Dept {
+  const dept = requestedDept(req)
+  const token = req.headers.authorization?.split(' ')[1]
+  if (!token) return dept
+
+  let roles: string[] = []
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
+    roles = payload.realm_access?.roles ?? []
+  } catch {
+    return dept
+  }
+
+  if (!allowedDepartmentsForRoles(roles).includes(dept)) {
+    throw new ForbiddenException(`Department is not allowed: ${dept}`)
+  }
+
+  return dept
+}
+
+function assertKidReport(req: Request) {
+  if (resolveDept(req) !== 'KID') {
+    throw new ForbiddenException('Report is available only for children department')
+  }
 }
 
 @ApiTags('documents')
@@ -66,6 +99,7 @@ export class DocumentsController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
+    assertKidReport(req)
     const now = new Date()
     const reportYear = Number(year || now.getFullYear())
     const reportMonth = Number(month || now.getMonth() + 1)
@@ -82,6 +116,7 @@ export class DocumentsController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
+    assertKidReport(req)
     const reportYear = Number(year || new Date().getFullYear())
     const buffer = await this.svc.form6Docx(reportYear, resolveOrgId(req))
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')

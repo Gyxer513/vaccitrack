@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { DepartmentSwitcher } from '../DepartmentSwitcher'
 import { IconSettings } from '../vaccination/icons'
 import { keycloak } from '../../lib/keycloak'
+import { ROLE_ADMIN, hasRole } from '../../lib/auth'
 
 const nav = [
   { to: '/patients', label: 'Пациенты' },
@@ -12,6 +13,7 @@ const nav = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation()
+  const isAdmin = hasRole(ROLE_ADMIN)
   const userName =
     keycloak.tokenParsed?.name ??
     keycloak.tokenParsed?.preferred_username ??
@@ -55,6 +57,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
           >
             <IconSettings size={18} />
           </Link>
+          {isAdmin && (
+            <a
+              href="/auth/admin/master/console/"
+              className="vt-btn vt-btn-ghost"
+              target="_blank"
+              rel="noreferrer"
+              title="Keycloak Admin Console"
+            >
+              Keycloak
+            </a>
+          )}
           <span className="vt-user">{userName}</span>
           <button type="button" className="vt-logout" onClick={handleLogout}>
             Выйти

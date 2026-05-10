@@ -1,6 +1,7 @@
 import { initTRPC, TRPCError } from '@trpc/server'
 import { ZodError } from 'zod'
 import type { PrismaClient, Dept } from '@vaccitrack/db'
+import { ROLE_ADMIN } from './auth'
 
 export type Context = {
   prisma: PrismaClient
@@ -40,7 +41,7 @@ const isAuthed = t.middleware(({ ctx, next }) => {
 export const hasRole = (role: string) =>
   t.middleware(({ ctx, next }) => {
     if (!ctx.user) throw new TRPCError({ code: 'UNAUTHORIZED' })
-    if (!ctx.user.roles.includes(role))
+    if (!ctx.user.roles.includes(ROLE_ADMIN) && !ctx.user.roles.includes(role))
       throw new TRPCError({ code: 'FORBIDDEN', message: `Required role: ${role}` })
     return next({ ctx: { user: ctx.user } })
   })

@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
+import { useDepartment } from '../components/DepartmentProvider'
 import { downloadDocument } from '../lib/document-download'
 
 export function ReportsPage() {
+  const { dept } = useDepartment()
   const currentYear = useMemo(() => new Date().getFullYear(), [])
   const currentMonth = useMemo(() => new Date().getMonth() + 1, [])
   const [form5Year, setForm5Year] = useState(String(currentYear))
@@ -33,7 +35,9 @@ export function ReportsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            <tr>
+            {dept === 'KID' ? (
+              <>
+              <tr>
               <td className="px-4 py-3">
                 <div className="font-medium text-gray-900">Форма N 5</div>
                 <div className="text-xs text-gray-500">
@@ -83,8 +87,8 @@ export function ReportsPage() {
                   Скачать ↓
                 </button>
               </td>
-            </tr>
-            <tr>
+              </tr>
+              <tr>
               <td className="px-4 py-3">
                 <div className="font-medium text-gray-900">Форма N 6</div>
                 <div className="text-xs text-gray-500">
@@ -113,7 +117,15 @@ export function ReportsPage() {
                   Скачать ↓
                 </button>
               </td>
-            </tr>
+              </tr>
+              </>
+            ) : (
+              <tr>
+                <td className="px-4 py-6 text-sm text-gray-500" colSpan={4}>
+                  Для взрослого отделения отчеты по детским календарям скрыты.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

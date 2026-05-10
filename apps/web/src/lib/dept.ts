@@ -5,10 +5,10 @@ export type Dept = 'KID' | 'ADULT'
 export const DEFAULT_DEPT: Dept = 'KID'
 export const DEPT_STORAGE_KEY = 'vt-dept'
 
-export function readDeptFromStorage(): Dept {
+export function readDeptFromStorage(fallback: Dept = DEFAULT_DEPT): Dept {
   if (typeof window === 'undefined') return DEFAULT_DEPT
   const v = window.localStorage.getItem(DEPT_STORAGE_KEY)
-  return v === 'KID' || v === 'ADULT' ? v : DEFAULT_DEPT
+  return v === 'KID' || v === 'ADULT' ? v : fallback
 }
 
 export function writeDeptToStorage(dept: Dept): void {

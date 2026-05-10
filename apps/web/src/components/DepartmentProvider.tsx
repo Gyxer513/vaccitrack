@@ -14,49 +14,53 @@ import {
   readDeptFromStorage,
   writeDeptToStorage,
 } from '../lib/dept'
+import { allowedDepartments, fallbackDepartment, isDepartmentAllowed } from '../lib/auth'
 
 type DepartmentContextValue = {
   dept: Dept
   setDept: (next: Dept) => void
+  allowedDepts: Dept[]
 }
 
 const DepartmentContext = createContext<DepartmentContextValue | null>(null)
 
-/**
- * Провайдер отделения. Хранит текущее значение в localStorage, синхронизирует
- * `<html data-dept="...">` (для CSS-токенов) и сбрасывает react-query кэш при
- * переключении — чтобы все списки/превью пере-зачитались уже с новым x-dept.
- */
 export function DepartmentProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const [dept, setDeptState] = useState<Dept>(() => readDeptFromStorage())
+  const allowedDepts = useMemo(() => allowedDepartments(), [])
+  const fallbackDept = useMemo(() => fallbackDepartment(), [])
+  const [dept, setDeptState] = useState<Dept>(() => {
+    const storedDept = readDeptFromStorage(fallbackDept)
+    return isDepartmentAllowed(storedDept) ? storedDept : fallbackDept
+  })
 
-  // На маунте подтягиваем тему к html — на случай, если в localStorage уже
-  // лежит ADULT, а index.html стартует с data-dept="kid".
   useEffect(() => {
+    if (!isDepartmentAllowed(dept)) {
+      writeDeptToStorage(fallbackDept)
+      setDeptState(fallbackDept)
+      return
+    }
+
+    writeDeptToStorage(dept)
     applyDeptToDom(dept)
-  }, [dept])
+  }, [dept, fallbackDept])
 
   const setDept = useCallback(
     (next: Dept) => {
-      if (next === dept) return
+      if (next === dept || !isDepartmentAllowed(next)) return
       writeDeptToStorage(next)
       applyDeptToDom(next)
       setDeptState(next)
-      // Сбрасываем все кэши react-query — следующий refetch пойдёт уже с
-      // новым x-dept хедером и вернёт пациентов/нозологии другого отделения.
       queryClient.invalidateQueries()
-      // Редирект на /patients: если юзер был на карточке конкретного пациента
-      // /patients/:id, то после смены dept этот пациент станет «не из нашего
-      // отделения» и getById вернёт not-found. Чтобы не показывать ошибку —
-      // выбрасываем на список, который сам перезапросится с новым dept.
       navigate('/patients')
     },
     [dept, queryClient, navigate],
   )
 
-  const value = useMemo<DepartmentContextValue>(() => ({ dept, setDept }), [dept, setDept])
+  const value = useMemo<DepartmentContextValue>(
+    () => ({ dept, setDept, allowedDepts }),
+    [dept, setDept, allowedDepts],
+  )
 
   return <DepartmentContext.Provider value={value}>{children}</DepartmentContext.Provider>
 }

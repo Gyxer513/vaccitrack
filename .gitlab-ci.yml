@@ -1,0 +1,78 @@
+stages:
+  - check
+  - deploy
+  - rollback
+
+variables:
+  DEPLOY_ROOT: /srv/imunova
+  DEPLOY_ENV_FILE: /srv/imunova/.env.deploy-local
+  DEPLOY_COMPOSE_FILE: docker-compose.deploy-local.yml
+
+default:
+  tags:
+    - imunova
+    - docker
+
+check:
+  stage: check
+  image: node:20-bookworm
+  script:
+    - corepack enable
+    - corepack pnpm install --frozen-lockfile
+    - corepack pnpm db:generate
+    - corepack pnpm typecheck
+    - corepack pnpm test
+
+deploy:
+  stage: deploy
+  image: docker:27
+  resource_group: imunova-deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "feat/adult-migration"'
+      when: manual
+    - when: never
+  before_script:
+    - docker info
+    - docker compose version
+    - test -f "$DEPLOY_ENV_FILE"
+    - mkdir -p "$DEPLOY_ROOT/state"
+  script:
+    - rm -rf "$DEPLOY_ROOT/app.next"
+    - mkdir -p "$DEPLOY_ROOT/app.next"
+    - tar --exclude=.git --exclude=node_modules --exclude=.turbo -cf - . | tar -xf - -C "$DEPLOY_ROOT/app.next"
+    - if [ -f "$DEPLOY_ROOT/state/current_revision" ]; then cp "$DEPLOY_ROOT/state/current_revision" "$DEPLOY_ROOT/state/previous_revision"; fi
+    - rm -rf "$DEPLOY_ROOT/app.previous"
+    - if [ -d "$DEPLOY_ROOT/app" ]; then mv "$DEPLOY_ROOT/app" "$DEPLOY_ROOT/app.previous"; fi
+    - mv "$DEPLOY_ROOT/app.next" "$DEPLOY_ROOT/app"
+    - cd "$DEPLOY_ROOT/app"
+    - docker compose --env-file "$DEPLOY_ENV_FILE" -f "$DEPLOY_COMPOSE_FILE" build
+    - docker compose --env-file "$DEPLOY_ENV_FILE" -f "$DEPLOY_COMPOSE_FILE" --profile migrate run --rm migrate
+    - docker compose --env-file "$DEPLOY_ENV_FILE" -f "$DEPLOY_COMPOSE_FILE" up -d --remove-orphans
+    - echo "$CI_COMMIT_SHA" > "$DEPLOY_ROOT/state/current_revision"
+  environment:
+    name: imunova-lan
+    url: http://imunova.lan
+
+rollback:
+  stage: rollback
+  image: docker:27
+  resource_group: imunova-deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "feat/adult-migration"'
+      when: manual
+    - when: never
+  before_script:
+    - docker info
+    - docker compose version
+    - test -f "$DEPLOY_ENV_FILE"
+    - test -d "$DEPLOY_ROOT/app.previous"
+  script:
+    - rollback_id="$(date +%Y%m%d%H%M%S)"
+    - if [ -d "$DEPLOY_ROOT/app" ]; then mv "$DEPLOY_ROOT/app" "$DEPLOY_ROOT/app.failed.$rollback_id"; fi
+    - mv "$DEPLOY_ROOT/app.previous" "$DEPLOY_ROOT/app"
+    - cd "$DEPLOY_ROOT/app"
+    - docker compose --env-file "$DEPLOY_ENV_FILE" -f "$DEPLOY_COMPOSE_FILE" up -d --build --remove-orphans
+    - if [ -f "$DEPLOY_ROOT/state/previous_revision" ]; then mv "$DEPLOY_ROOT/state/previous_revision" "$DEPLOY_ROOT/state/current_revision"; fi
+  environment:
+    name: imunova-lan
+    url: http://imunova.lan

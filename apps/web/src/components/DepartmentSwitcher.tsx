@@ -3,16 +3,17 @@ import { DEPT_LABELS, type Dept } from '../lib/dept'
 
 const ORDER: Dept[] = ['KID', 'ADULT']
 
-/**
- * Сегмент-переключатель «Дети / Взрослые» для шапки. Меняет
- * DepartmentContext, который синхронизирует localStorage,
- * <html data-dept="..."> и invalidate'ит react-query кэш.
- */
 export function DepartmentSwitcher() {
-  const { dept, setDept } = useDepartment()
+  const { dept, setDept, allowedDepts } = useDepartment()
+  const visible = ORDER.filter((d) => allowedDepts.includes(d))
+
+  if (visible.length <= 1) {
+    return <div className="vt-dept-switcher single">{DEPT_LABELS[visible[0] ?? dept]}</div>
+  }
+
   return (
     <div className="vt-dept-switcher" role="tablist" aria-label="Отделение">
-      {ORDER.map((d) => (
+      {visible.map((d) => (
         <button
           key={d}
           type="button"

@@ -13,9 +13,8 @@
   "roles": {
     "realm": [
       { "name": "admin" },
-      { "name": "doctor" },
-      { "name": "nurse" },
-      { "name": "registrar" }
+      { "name": "doctor_kid" },
+      { "name": "doctor_adult" }
     ]
   },
   "clients": [
@@ -30,6 +29,8 @@
       "redirectUris": [
         "https://localhost/*",
         "http://localhost/*",
+        "https://imunova.lan/*",
+        "http://imunova.lan/*",
         "https://vaccitrack.lrc.local/*",
         "http://vaccitrack.lrc.local/*"
       ],

@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core'
 import { ValidationPipe } from '@nestjs/common'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
 import * as trpcExpress from '@trpc/server/adapters/express'
-import { appRouter } from '@vaccitrack/trpc'
+import { appRouter, resolveAuthorizedDepartment } from '@vaccitrack/trpc'
 import { prisma } from '@vaccitrack/db'
 import { AppModule } from './app.module'
 
@@ -38,29 +38,32 @@ async function bootstrap() {
               login: 'dev',
               fullName: 'Dev User',
               orgId: process.env.DEV_ORG_ID,
-              roles: ['admin', 'doctor', 'nurse', 'registrar'],
+              roles: ['admin'],
             },
           }
         }
 
         if (!token) return devFallback()
+
+        let payload: any
         try {
-          const payload = JSON.parse(
-            Buffer.from(token.split('.')[1], 'base64').toString(),
-          )
-          return {
-            prisma,
-            dept,
-            user: {
-              sub: payload.sub,
-              login: payload.preferred_username,
-              fullName: payload.name ?? payload.preferred_username,
-              orgId: payload.org_id ?? payload.azp,
-              roles: payload.realm_access?.roles ?? [],
-            },
-          }
+          payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
         } catch {
           return devFallback()
+        }
+
+        const roles = payload.realm_access?.roles ?? []
+        const authorizedDept = resolveAuthorizedDepartment(dept, roles)
+        return {
+          prisma,
+          dept: authorizedDept,
+          user: {
+            sub: payload.sub,
+            login: payload.preferred_username,
+            fullName: payload.name ?? payload.preferred_username,
+            orgId: payload.org_id ?? payload.azp,
+            roles,
+          },
         }
       },
     }),

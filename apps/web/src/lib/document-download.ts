@@ -1,4 +1,5 @@
 import { readDeptFromStorage } from './dept'
+import { fallbackDepartment, isDepartmentAllowed } from './auth'
 import { keycloak } from './keycloak'
 
 type DownloadDocumentOptions = {
@@ -9,8 +10,9 @@ type DownloadDocumentOptions = {
 export async function downloadDocument({ url, filename }: DownloadDocumentOptions): Promise<void> {
   await keycloak.updateToken(30)
 
+  const storedDept = readDeptFromStorage(fallbackDepartment())
   const headers: Record<string, string> = {
-    'x-dept': readDeptFromStorage(),
+    'x-dept': isDepartmentAllowed(storedDept) ? storedDept : fallbackDepartment(),
   }
 
   if (keycloak.token) {

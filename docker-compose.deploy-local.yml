@@ -34,7 +34,6 @@ services:
       KC_HTTP_ENABLED: true
       KC_HTTP_RELATIVE_PATH: /auth
       KC_PROXY: edge
-      KC_SPI_THEME_DEFAULT: immunova
     volumes:
       - ./infra/keycloak:/opt/keycloak/data/import:ro
       - ./infra/keycloak-themes:/opt/keycloak/themes:ro
